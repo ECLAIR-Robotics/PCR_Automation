@@ -1,0 +1,16 @@
+{
+    "build" : {
+        "dockerfile": "Dockerfile",
+        "context": ".."
+    },
+
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-azuretools.vscode-docker"
+            ]
+        }
+    },
+    "features": {"git": "os-provided"},
+    "onCreateCommand": "./.devcontainer/onCreateCommand.sh"
+}
