@@ -43,6 +43,7 @@ ifeq ($(findstring MINGW,$(UNAME_S)),MINGW)
 							else \
 								echo "Chocolatey already installed."; \
 							fi
+	FIND_CMD := findstr
 endif
 
 ifeq ($(findstring MSYS,$(UNAME_S)),MSYS)
@@ -83,6 +84,7 @@ install:
 	@echo "Installing system dependencies..."
 	@$(SYSTEM_DEPENDENCIES)
 	@echo "Checking for conda..."
+	
 	@if ! command -v conda &> /dev/null; then \
 		echo "conda could not be found, installing Miniconda..."; \
 		mkdir -p $(dirname $MINICONDA_INSTALLER); \
@@ -95,13 +97,11 @@ install:
 		echo "conda already installed."; \
 	fi
 	@echo "Checking for conda environment 'pcr'..."
-	@if ! conda env list | grep -q 'pcr'; then \
-		echo "conda environment 'pcr' could not be found, creating it..."; \
-		conda create -f environment.yml; \
-		echo "environment 'pcr' created."; \
-	else \
-		echo "conda environment 'pcr' already exists."; \
-	fi
+	@if [ "$(UNAME_S)" = "MINGW" ] || [ "$(UNAME_S)" = "MSYS" ] || [ "$(UNAME_S)" = "CYGWIN" ]; then \
+        conda env list | findstr /C:"pcr" >nul || (echo "conda environment 'pcr' could not be found, creating it..." && conda env create -f environment.yml && echo "environment 'pcr' created."); \
+    else \
+        conda env list | grep -q 'pcr' || (echo "conda environment 'pcr' could not be found, creating it..." && conda env create -f environment.yml && echo "environment 'pcr' created."); \
+    fi
 	@echo "Activating environment 'pcr'..."
 	@echo "Installing modules from 'requirements.txt'"
 	@eval "$$(conda shell.bash hook)"; \
