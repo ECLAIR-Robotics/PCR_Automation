@@ -97,13 +97,12 @@ install:
 	@echo "Checking for conda environment 'pcr'..."
 	@if ! conda env list | grep -q 'pcr'; then \
 		echo "conda environment 'pcr' could not be found, creating it..."; \
-		conda create -n pcr python=3.10 -y; \
+		conda create -f environment.yml; \
 		echo "environment 'pcr' created."; \
 	else \
 		echo "conda environment 'pcr' already exists."; \
 	fi
 	@echo "Activating environment 'pcr'..."
-	@eval "$$(conda shell.bash hook)"; \
-	conda activate pcr
 	@echo "Installing modules from 'requirements.txt'"
-	pip install -r "requirements.txt"
+	@eval "$$(conda shell.bash hook)"; \
+	export PATH="$(HOME)/miniconda/bin:$$PATH" && conda activate pcr && pip install -r "requirements.txt"\

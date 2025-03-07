@@ -1,0 +1,10 @@
+name: pcr
+channels:
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+    - -r requirements.txt
+variables:
+  TESSDATA_PREFIX: ${HOME}/miniconda/share/tessdata
