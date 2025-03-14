@@ -111,22 +111,23 @@ CC := gcc
 
 ifeq ($(OS),Windows_NT)
 	LIB_FILE := $(LIB_DIR)/number-detection-pkg.dll
-	CFLAGS := -dynamiclib -o $(LIB_FILE)
+	CFLAGS := -dynamiclib -o
 else 
 	ifeq ($(UNAME_S),Darwin)
 		LIB_FILE := $(LIB_DIR)/number-detection-pkg.dylib
-		CFLAGS := -dynamiclib -o $(LIB_FILE)
+		CFLAGS := -dynamiclib -o
+		SRCFLAGS := -fPIC -arch x86_64
 	else ifeq ($(UNAME_S),Linux)
 		LIB_FILE := $(LIB_DIR)/number-detection-pkg.so
-		CFLAGS := -shared -o $(LIB_FILE)
+		CFLAGS := -shared -o
 	else 
 		$(error Unsupported operating system: $(UNAME_S))
 	endif
 endif
 
 .PHONY: compile_lib
-compile_lib:
+compile:
 	@echo "Compiling $(SRC_FILE) into $(LIB_FILE)..."
 	@mkdir -p $(LIB_DIR)
-	@$(CC) $(SRC_FILE) $(CFLAGS)
+	@$(CC) $(SRCFLAGS) $(SRC_FILE) $(CFLAGS) $(LIB_FILE)
 	@echo "Compilation finished."
