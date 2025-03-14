@@ -277,11 +277,27 @@ def compute_real_world_coordinates(curr_averages, center, pose, mtx, frame):
     return irl_coords
 
 def finding_the_angle(frame, tuple_april, list_beaker, pose, mtx):
-    compute_real_world_coordinates(list_beaker, tuple_april, pose, mtx, frame)
-    x_april = tuple_april[0]
-    y_april = tuple_april[1]
-    x_beaker = list_beaker[0][0]
-    y_beaker = list_beaker[0][1]
+    coord = []
+    coord = compute_real_world_coordinates(list_beaker, tuple_april, pose, mtx, frame)
+    # x_april = tuple_april[0]
+    # y_april = tuple_april[1]
+    # x_beaker = list_beaker[0][0]
+    # y_beaker = list_beaker[0][1]
+    #return f"{coord}"
+
+    x1 = coord[0][0]  # 10.5
+    y1 = coord[0][1]  # 3.2
+    #z1 = coord[0][2]  # 1.0
+
+    x2 = coord[1][0]  # 12.1
+    y2 = coord[1][1]  # 4.8
+    #z2 = coord[1][2]  # 0.9
+
+    x_april = x1
+    y_april = y1
+    x_beaker = x2
+    y_beaker = y2
+
     
     perpendicular = abs(y_beaker - y_april)
     base = abs(x_beaker - x_april)
