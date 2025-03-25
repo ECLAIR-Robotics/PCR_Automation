@@ -13,6 +13,9 @@
 ### If you need to compile prefixMin.c
 - gcc -shared -o library/number-detection-pkg.dylib -fPIC -arch x86_64 prefixMin.c 
 
+### Adding custom path to training data
+export TESSDATA_PREFIX=./number_detection/tessdata/
+
 # parallelPrefix.py
 
 This module implements a prefix-minimum solution to the cropping problem using OpenCV and NumPy. It includes functions for image processing, such as finding contours, rotating images, and cropping images based on certain heuristics.
