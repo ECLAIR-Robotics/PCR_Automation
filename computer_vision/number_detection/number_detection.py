@@ -6,45 +6,53 @@ import re
 
 from crop_tool import crop_image
 
-def preprocessing(img,debug=False,still=False):
+'''
+OTSU vs GLOBAL
+
+- Global handles the margins of the dial better, leading to less of the number cutoff. But 
+
+- However glare noise is markedly reduced in Otsu 
+
+- There are some strange cases where '5' is confused for 0
+'''
+
+
+def blur(img):
+    median = cv2.medianBlur(img,9)
+    #norm = cv2.blur(img,(9,9))
+
+    # cv2.imshow("norm",norm)
+
+    return median
+
+
+def preprocessing(img,debug=True,still=True):
     #grayscale
     if img is None or img.size == 0:
          return None
-
-    img = cv2.bitwise_not(img)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    # img = cv2.equalizeHist(img)
-    # img = cv2.GaussianBlur(img,(3,3),0)
-    img = cv2.medianBlur(img,5)
-
-    #NOTE: was 200, 215 clears 06.5.jpg issue, top 240
-    img = cv2.threshold(img,200,240, cv2.THRESH_BINARY)[1]
-
-    #NOTE: was 4x4 and 1 it
-    kernel = cv2.getStructuringElement(cv2.MORPH_CROSS,(4,4))
-    img = cv2.dilate(img,kernel=kernel,iterations=1)
-
-    #NOTE: was 3x3 and 3 it
-    kernel = cv2.getStructuringElement(cv2.MORPH_CROSS,(3,3))
-    img = cv2.erode(img,kernel=kernel,iterations=3)
-
-    #NOTE: 3 it
-    img = cv2.morphologyEx(img,cv2.MORPH_CLOSE,kernel, iterations=3)
     
-    # NOTE: comment these two lines out in order to display processed results
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    img = blur(img)
+
+    
+    _, otsu = cv2.threshold(img,0,255,cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)
+
     if debug:
-        cv2.imshow("final product",img)
+        cv2.imshow("preprocssed",otsu)
     if still:
         cv2.waitKey(0)
+    
+    # NOTE: comment these two lines out in order to display processed results
 
-    return img
+    return otsu
 
 def read_img(img):
 
-    img = preprocessing(img)
+    input = preprocessing(img)
+
     if img is None:
          return ""
-    data = pytesseract.image_to_string(img,config='--psm 8  --oem 3 -c tessedit_char_whitelist=.0123456789')
+    data = pytesseract.image_to_string(input,config='--psm 8  --oem 3 -c tessedit_char_whitelist=.0123456789')
     
     filtered_data = re.sub(r'[^0-9.]', '', data)
 
