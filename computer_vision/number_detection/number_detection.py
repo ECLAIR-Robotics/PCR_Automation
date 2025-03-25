@@ -26,7 +26,7 @@ def blur(img):
     return median
 
 
-def preprocessing(img,debug=True,still=True):
+def preprocessing(img,debug=False,still=False):
     #grayscale
     if img is None or img.size == 0:
          return None
@@ -34,7 +34,6 @@ def preprocessing(img,debug=True,still=True):
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     img = blur(img)
 
-    
     _, otsu = cv2.threshold(img,0,255,cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)
 
     if debug:
@@ -52,7 +51,7 @@ def read_img(img):
 
     if img is None:
          return ""
-    data = pytesseract.image_to_string(input,config='--psm 8  --oem 3 -c tessedit_char_whitelist=.0123456789')
+    data = pytesseract.image_to_string(input,config='--psm 8 --oem 3 -l digits -c tessedit_char_whitelist=.0123456789 -c load_system_dawg=0 -c load_freq_dawg=0')
     
     filtered_data = re.sub(r'[^0-9.]', '', data)
 
