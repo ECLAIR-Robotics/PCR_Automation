@@ -3,6 +3,7 @@ import numpy as np
 import threading
 import ctypes
 import platform
+import math
 
 _initialized = False
 
@@ -49,22 +50,33 @@ def prefix_min(arr, results, axis=0):
     results[axis] = prefix_min_arr
 
 def get_mask(results:dict):
-    prefix_min_tb = results[0]
-    prefix_min_lr = results[1]
-    prefix_min_bt = results[2]
-    prefix_min_rl = results[3]
+    prefix_min_tb = results[0].astype(np.uint8)
+    prefix_min_lr = results[1].astype(np.uint8)
+    prefix_min_bt = results[2].astype(np.uint8)
+    prefix_min_rl = results[3].astype(np.uint8)
+
+    # cv2.imshow("prefix min blah", prefix_min_bt)
+    # cv2.imshow("prefix min blah", prefix_min_lr)
 
     lowerThresh = 0
     upperThresh = 25
 
-    combined_mask = ((prefix_min_tb >= lowerThresh) & (prefix_min_tb <= upperThresh)) & \
-            (prefix_min_lr >= lowerThresh) & (prefix_min_lr <= upperThresh) & \
-            (prefix_min_rl >= lowerThresh) & (prefix_min_rl <= upperThresh) & \
-            (prefix_min_bt >= lowerThresh) & (prefix_min_bt <= upperThresh) 
+    combined_mask = np.zeros_like(prefix_min_tb, dtype=np.uint8)
+
+    combined_mask[
+        (prefix_min_tb >= lowerThresh) & (prefix_min_tb <= upperThresh) &
+        (prefix_min_lr >= lowerThresh) & (prefix_min_lr <= upperThresh) &
+        (prefix_min_rl >= lowerThresh) & (prefix_min_rl <= upperThresh) &
+        (prefix_min_bt >= lowerThresh) & (prefix_min_bt <= upperThresh)
+    ] = 255
+    
 
     kernel = np.ones((5, 5), np.uint8)
-    combined_mask = cv2.dilate(combined_mask.astype(np.uint8), kernel, iterations=2)
-    combined_mask = cv2.erode(combined_mask, kernel, iterations=2)
+    combined_mask = cv2.dilate(combined_mask.astype(np.uint8), kernel, iterations=1)
+    # combined_mask = cv2.erode(combined_mask, kernel, iterations=2)
+
+    # cv2.imshow("Combined mask", combined_mask)
+    # cv2.waitKey(0)
 
     return combined_mask
 
@@ -178,7 +190,7 @@ def crop_image(img):
             rotated_img = img
         cv2.rectangle(copy_img,(x,y),(x+w,y+h),(255,0,0),2)
         # NOTE: applied heursitic to right and bottom sides
-        heuristic = 5
+        heuristic = 0
         
         cropped_img = rotated_img[y+heuristic:y+h-heuristic, x+heuristic:x+w-heuristic]
 
