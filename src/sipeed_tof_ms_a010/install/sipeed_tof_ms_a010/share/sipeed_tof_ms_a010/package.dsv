@@ -1,0 +1,8 @@
+source;share/sipeed_tof_ms_a010/hook/cmake_prefix_path.ps1
+source;share/sipeed_tof_ms_a010/hook/cmake_prefix_path.dsv
+source;share/sipeed_tof_ms_a010/hook/cmake_prefix_path.sh
+source;share/sipeed_tof_ms_a010/local_setup.bash
+source;share/sipeed_tof_ms_a010/local_setup.dsv
+source;share/sipeed_tof_ms_a010/local_setup.ps1
+source;share/sipeed_tof_ms_a010/local_setup.sh
+source;share/sipeed_tof_ms_a010/local_setup.zsh
