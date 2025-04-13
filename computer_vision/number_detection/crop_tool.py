@@ -110,15 +110,17 @@ def get_skew_angle(contour):
 
 # Rotate the image around its center
 def rotate_image(cvImage, angle: float):
+    angle *= -1.0
     newImage = cvImage.copy()
-    (h, w) = newImage.shape[:2]
-    center = (w // 2, h // 2)
-    M = cv2.getRotationMatrix2D(center, angle, 1.0)
-    newImage = cv2.warpAffine(newImage, M, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+    if angle != 0.0:
+        (h, w) = newImage.shape[:2]
+        center = (w // 2, h // 2)
+        M = cv2.getRotationMatrix2D(center, angle, 1.0)
+        newImage = cv2.warpAffine(newImage, M, (w, h), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
     return newImage
 
-def crop_image(img):
-    # Call the function and display the result
+def find_bound_box(img):
+ # Call the function and display the result
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
@@ -174,29 +176,18 @@ def crop_image(img):
             largest_bbox = (x,y,w,h)
             largest_contour = contour
 
-    if largest_bbox is not None:
-        x,y,w,h = largest_bbox
+    return largest_bbox, get_skew_angle(largest_contour)
 
-        # print(f"RATION w/h: {w/h}")
+def crop_image(img, bbox):
+   
+    if bbox is not None:
+        x,y,w,h = bbox
 
-        skew_angle = get_skew_angle(largest_contour)
-        # cv2.drawContours(img,largest_contour,-1,(0,255,0),2)
-
-        # print(f"SKEW: {skew_angle} \t CORRECTION: {skew_angle*-1.0}")
-        
-        if skew_angle !=  0.0:
-            rotated_img = rotate_image(img,-1.0*skew_angle)
-        else:
-            rotated_img = img
-        cv2.rectangle(copy_img,(x,y),(x+w,y+h),(255,0,0),2)
-        # NOTE: applied heursitic to right and bottom sides
         heuristic = 0
-        
-        cropped_img = rotated_img[y+heuristic:y+h-heuristic, x+heuristic:x+w-heuristic]
+
+        cropped_img = img[y+heuristic:y+h-heuristic, x+heuristic:x+w-heuristic]
 
     else:
         cropped_img = img
 
-    # cv2.imshow('bounding box',copy_img)
-
-    return cropped_img, copy_img
+    return cropped_img
