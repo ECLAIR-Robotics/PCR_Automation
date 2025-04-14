@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 import os
 import sys
+
+# Add xArm python modules to the PATH
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 import time
 import json
 import argparse
 from mypy_types import RequestDict
 import logging
-from pcr.gizzmos import AtalantaModule
 
 from xarm.wrapper import XArmAPI
-from gizzmos import CustomGripper, PressureSensor
+from pcr.gizzmos import CustomGripper, PressureSensor, AtalantaModule
 
 class RunJob():
     SPEED = 50
