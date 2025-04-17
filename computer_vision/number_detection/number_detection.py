@@ -3,8 +3,11 @@ import pytesseract
 from pytesseract import image_to_string
 import numpy as np
 import re
+from collections import Counter
 
 from crop_tool import crop_image
+from crop_tool import find_bound_box
+from crop_tool import rotate_image
 
 '''
 OTSU vs GLOBAL
@@ -69,6 +72,44 @@ def read_img(img):
     # print(filtered_data)
 
     return filtered_data
+
+def perform_detection(cap : cv2.VideoCapture):
+    if not cap.isOpened():
+        print("Camera not found or not accessible")
+        exit(1)
+
+    for i in range(0,2):
+        # NOTE: rn this doesn't do any error handling
+        # capture 10 frames and store into a list 
+        frames = [cap.read()[1] for i in range(0,10)]
+
+        # ASSUME: frames are captured within same time frame, thus same position
+
+        # take one frame and get bounding box, store as variable use later
+        bbox, skew = find_bound_box(frames[0])
+
+        if skew != 0.0:
+            frames = list(map(lambda frame: rotate_image(frame,skew), frames))
+
+        # crop 10 frames 
+        cropped_frames = map(lambda frame: crop_image(frame,bbox), frames)
+
+        # run read_img() and store return results into a list
+        res = map(read_img,  cropped_frames)
+
+        # check for consensus by first creating a Counter 
+        result_count = Counter(res)
+        
+        # then call max() of that counter object 
+        consensus = max(result_count, key=result_count.get)
+
+        # finally look at the frequency and if it passes a threshold then return
+        if (result_count.get(consensus) >= 8):
+            return consensus
+
+
+    #return empty
+    return ""
 
 # run video feed and 
 

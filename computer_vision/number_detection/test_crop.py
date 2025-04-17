@@ -5,6 +5,8 @@ import glob
 import argparse
 import time
 from crop_tool import crop_image
+from crop_tool import find_bound_box
+from crop_tool import rotate_image
 
 class TestCropping(unittest.TestCase):
 
@@ -26,7 +28,9 @@ class TestCropping(unittest.TestCase):
             exit()
         
         start_time = time.time()
-        cropped_img,_ = crop_image(img)
+        bbox, skew = find_bound_box(img)
+        img = rotate_image(img,skew)
+        cropped_img = crop_image(img,bbox)
         end_time = time.time()
 
         exec_time = (end_time - start_time) * 1000
