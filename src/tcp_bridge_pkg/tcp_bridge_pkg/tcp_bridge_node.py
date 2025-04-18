@@ -11,6 +11,8 @@ class TCPBridgeNode(Node):
 
         # ROS 2 publishers and subscribers
         self.pub = self.create_publisher(String, 'input_topic', 10)
+
+        self.output_pub = self.create_publisher(String, 'output_topic', 10)
         self.sub = self.create_subscription(String, 'output_topic', self.ros_to_socket_callback, 10)
 
         # TCP server setup
@@ -32,8 +34,10 @@ class TCPBridgeNode(Node):
             try:
                 data = self.conn.recv(1024)
                 if not data:
-                    self.get_logger().info('Client disconnected')
-                    break
+                    if self.conn.fileno() == -1:
+                        self.get_logger().info('Client disconnected')
+                        break
+                    else: continue # O.W try again
                 message = data.decode().strip()
                 self.get_logger().info(f'Received over TCP: "{message}"')
                 ros_msg = String()
@@ -47,8 +51,7 @@ class TCPBridgeNode(Node):
             except Exception as e:
                 self.get_logger().error(f"Socket receive error: {e}")
                 break
-
-
+            
     def call_home_service(self):
         from xarm_msgs.srv import MoveHome
 
@@ -66,16 +69,22 @@ class TCPBridgeNode(Node):
 
         #subfunction that we will pass to callback()
         def on_result(future):
+            ros_msg = String()
+
             if future.result() is not None:
                 self.get_logger().info(f'MoveHome success: {future.result().ret}')
+                ros_msg.data = f'MoveHome success: {future.result().ret}'
             else:
                 self.get_logger().error('MoveHome service call failed')
-        
+                ros_msg.data = 'MoveHome service call failed'
+            
+            self.output_pub.publish(ros_msg)
+
         #when the service is completed, exec on_result()
         future.add_done_callback(on_result)
 
-
     def ros_to_socket_callback(self, msg):
+        self.get_logger().debug('Subscriber callback triggered')  # Add debug logging
         if hasattr(self, 'conn'):
             try:
                 response = f"[ROS] {msg.data}\n"
