@@ -58,14 +58,21 @@ class TCPBridgeNode(Node):
             return
 
         request = MoveHome.Request()
-
         future = client.call_async(request)
-        rclpy.spin_until_future_complete(self, future)
 
-        if future.result() is not None:
-            self.get_logger().info(f'MoveHome success: {future.result().ret}')
-        else:
-            self.get_logger().error('MoveHome service call failed')
+        # NOTE: according to GPT this is leading to double spinning, ROS no likey
+        # we already had ROS spinning from main(), no need for another thread
+        #rclpy.spin_until_future_complete(self, future)
+
+        #subfunction that we will pass to callback()
+        def on_result(future):
+            if future.result() is not None:
+                self.get_logger().info(f'MoveHome success: {future.result().ret}')
+            else:
+                self.get_logger().error('MoveHome service call failed')
+        
+        #when the service is completed, exec on_result()
+        future.add_done_callback(on_result)
 
 
     def ros_to_socket_callback(self, msg):
