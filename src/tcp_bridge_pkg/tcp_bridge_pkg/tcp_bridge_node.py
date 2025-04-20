@@ -66,9 +66,22 @@ class TCPBridgeNode(Node):
                     #evoke handle
                     self.call_position_service()
 
-                #TODO: get to work w/h hardcoded vals
-                elif message.lower() == 'move':
-                    self.call_move_service()
+                elif message.lower().startswith('move'):
+                    try:
+                        #parse "move x y z" fmt
+                        parts = message.split()
+                        if len(parts) >= 4:
+                            x = float(parts[1])
+                            y = float(parts[2])
+                            z = float(parts[3])
+                            
+                            self.call_move_service(x,y,z)
+                        else:
+                            error_msg = "Invalid move command. Use format: 'move x y z' "
+                            self.conn.sendall(error_msg.encode())
+                    except ValueError:
+                        error_msg = "Invalid coordinates. Use numbers"
+                        self.conn.sendall(error_msg.encode())
 
 
             except Exception as e:
@@ -128,7 +141,7 @@ class TCPBridgeNode(Node):
         
         return 
 
-    def call_move_service(self):
+    def call_move_service(self,*args):
         from xarm_msgs.srv import MoveCartesian
 
         client = self.create_client(MoveCartesian, '/ufactory/set_position')
@@ -136,8 +149,10 @@ class TCPBridgeNode(Node):
             self.get_logger().error('MoveCartesian service not available')
             return
         
+        x,y,z = args 
+        
         request = MoveCartesian.Request()
-        request.pose = [300.0, 0.0, 300.0, 3.14, 0.0, 0.0]
+        request.pose = [x, y, z, 3.14, 0.0, 0.0]
         request.speed = 100.0
         request.acc = 10.0
         mvtime = 0.0
