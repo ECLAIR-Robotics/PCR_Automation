@@ -3,6 +3,7 @@ import threading
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
+from xarm_msgs.msg import RobotMsg
 
 
 class TCPBridgeNode(Node):
@@ -13,7 +14,20 @@ class TCPBridgeNode(Node):
         self.pub = self.create_publisher(String, 'input_topic', 10)
 
         self.output_pub = self.create_publisher(String, 'output_topic', 10)
-        self.sub = self.create_subscription(String, 'output_topic', self.ros_to_socket_callback, 10)
+        self.sub = self.create_subscription(String, 
+            'output_topic', 
+            self.ros_to_socket_callback, 
+            10)
+
+        
+        # Subscriber node that monitors for the robot state topic
+        self.state_sub = self.create_subscription(RobotMsg, 
+            '/ufactory/robot_states',
+            self.robot_state_callback,
+            10)
+        
+        self.current_pose = None
+        self.current_angles = None
 
         # TCP server setup
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -47,6 +61,11 @@ class TCPBridgeNode(Node):
                 # If message is 'home', trigger the service call
                 if message.lower() == 'home':
                     self.call_home_service()
+
+                elif message.lower() == 'position':
+                    #evoke handle
+                    self.call_position_service()
+
 
             except Exception as e:
                 self.get_logger().error(f"Socket receive error: {e}")
@@ -82,6 +101,37 @@ class TCPBridgeNode(Node):
 
         #when the service is completed, exec on_result()
         future.add_done_callback(on_result)
+
+    def call_position_service(self):
+        if self.current_pose is None:
+            self.get_logger().error('No position data avaliable')
+            return
+        
+        if hasattr(self,'conn'):
+            try:
+                position = self.current_pose[:3]
+                rotation = self.current_pose[3:]
+
+                state_msg = (
+                f"Position: x={position[0]:.2f}, y={position[1]:.2f}, z={position[2]:.2f}\n"
+                f"Rotation: r={rotation[0]:.2f}, p={rotation[1]:.2f}, y={rotation[2]:.2f}\n"
+                )
+
+                self.conn.sendall(state_msg.encode())
+                self.get_logger().info('Sent position data to client')
+            except Exception as e: 
+                self.get_logger().error(f'Failed to send position data: {e}')
+        
+
+        return 
+
+    # Subscriber Actions
+
+    def robot_state_callback(self, msg: RobotMsg):
+        # update our values, only send when client requests them
+        self.current_pose = msg.pose
+        self.current_angles = msg.angle
+        
 
     def ros_to_socket_callback(self, msg):
         self.get_logger().debug('Subscriber callback triggered')  # Add debug logging
