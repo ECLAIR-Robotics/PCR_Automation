@@ -66,6 +66,10 @@ class TCPBridgeNode(Node):
                     #evoke handle
                     self.call_position_service()
 
+                #TODO: get to work w/h hardcoded vals
+                elif message.lower() == 'move':
+                    self.call_move_service()
+
 
             except Exception as e:
                 self.get_logger().error(f"Socket receive error: {e}")
@@ -122,8 +126,37 @@ class TCPBridgeNode(Node):
             except Exception as e: 
                 self.get_logger().error(f'Failed to send position data: {e}')
         
-
         return 
+
+    def call_move_service(self):
+        from xarm_msgs.srv import MoveCartesian
+
+        client = self.create_client(MoveCartesian, '/ufactory/set_position')
+        if not client.wait_for_service(timeout_sec=5.0):
+            self.get_logger().error('MoveCartesian service not available')
+            return
+        
+        request = MoveCartesian.Request()
+        request.pose = [300.0, 0.0, 300.0, 3.14, 0.0, 0.0]
+        request.speed = 100.0
+        request.acc = 10.0
+        mvtime = 0.0
+
+        future = client.call_async(request)
+
+        def on_result(future):
+            ros_msg = String()
+
+            if future.result() is not None:
+                self.get_logger().info(f'MoveCartesian success {future.result().ret}')
+                ros_msg.data = f'MoveCartesian success {future.result().ret}'
+            else:
+                self.get_logger().error('MoveCartesian service call failed')
+                ros_msg.data = 'MoveCartesian service call failed'
+            
+            self.output_pub.publish(ros_msg)
+
+        future.add_done_callback(on_result)
 
     # Subscriber Actions
 
