@@ -1,6 +1,7 @@
 import socket
 import threading
 import rclpy
+import json
 from rclpy.node import Node
 from std_msgs.msg import String
 from xarm_msgs.msg import RobotMsg
@@ -43,6 +44,15 @@ class TCPBridgeNode(Node):
         self.get_logger().info(f'Client connected from {addr}')
         threading.Thread(target=self.listen_to_socket, daemon=True).start()
 
+    """
+    msg fmt:
+    {
+    cmd: Str
+    args: Str[]
+    }
+    """
+
+
     def listen_to_socket(self):
         while rclpy.ok():
             try:
@@ -53,35 +63,26 @@ class TCPBridgeNode(Node):
                         break
                     else: continue # O.W try again
                 message = data.decode().strip()
-                self.get_logger().info(f'Received over TCP: "{message}"')
+                input = json.loads(message)
+                self.get_logger().info(f'Received over TCP: "{input}"')
+                
                 ros_msg = String()
                 ros_msg.data = message
                 self.pub.publish(ros_msg)
 
                 # If message is 'home', trigger the service call
-                if message.lower() == 'home':
+                if input["cmd"] == 'home':
                     self.call_home_service()
 
-                elif message.lower() == 'position':
+                elif input["cmd"] == 'position':
                     #evoke handle
                     self.call_position_service()
 
-                elif message.lower().startswith('move'):
-                    try:
-                        #parse "move x y z" fmt
-                        parts = message.split()
-                        if len(parts) >= 4:
-                            x = float(parts[1])
-                            y = float(parts[2])
-                            z = float(parts[3])
-                            
-                            self.call_move_service(x,y,z)
-                        else:
-                            error_msg = "Invalid move command. Use format: 'move x y z' "
-                            self.conn.sendall(error_msg.encode())
-                    except ValueError:
-                        error_msg = "Invalid coordinates. Use numbers"
-                        self.conn.sendall(error_msg.encode())
+                elif input["cmd"] == 'move':
+                    #parse "move x y z" fmt
+                    self.call_move_service(input["args"])
+                        
+
 
 
             except Exception as e:
@@ -149,7 +150,14 @@ class TCPBridgeNode(Node):
             self.get_logger().error('MoveCartesian service not available')
             return
         
-        x,y,z = args 
+        # numbers passed from json are supposed to floats
+        try:
+            x,y,z = map(float,args) 
+        except (ValueError, TypeError) as e:
+            self.get_logger().error(f'Invalid coordinates provided: {e}')
+            if hasattr(self, 'conn'):
+                error_msg = f"Error: Coordinates must be numbers\n"
+                self.output_pub.publish(error_msg.encode())
         
         request = MoveCartesian.Request()
         request.pose = [x, y, z, 3.14, 0.0, 0.0]
