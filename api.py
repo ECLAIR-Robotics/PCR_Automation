@@ -51,7 +51,9 @@ if __name__ == "__main__":
     commands = {
         "move": {"args": ["x","y","z"]},
         "home": {"args": []},
-        "position": {"args": []}
+        "position": {"args": []},
+        "clean_error": {"args":[]},
+        "clean_warn": {"args":[]}
     }
 
     try:

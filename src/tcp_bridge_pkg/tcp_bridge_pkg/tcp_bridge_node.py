@@ -5,6 +5,7 @@ import json
 from rclpy.node import Node
 from std_msgs.msg import String
 from xarm_msgs.msg import RobotMsg
+from xarm_msgs.srv import Call
 
 
 class TCPBridgeNode(Node):
@@ -81,14 +82,72 @@ class TCPBridgeNode(Node):
                 elif input["cmd"] == 'move':
                     #parse "move x y z" fmt
                     self.call_move_service(input["args"])
+                
+                elif input["cmd"] == 'clean_error':
+                    self.call_clean_error()
+                
+                elif input["cmd"] == 'clean_warn':
+                    self.call_clean_warning()
                         
-
-
-
             except Exception as e:
                 self.get_logger().error(f"Socket receive error: {e}")
                 break
+
+    def call_clean_error(self):
+
+        client = self.create_client(Call, '/ufactory/clean_error')
+        if not client.wait_for_service(timeout_sec=5.0):
+            self.get_logger().error('clean_error service not avaliable')
+            return
+        
+        request = Call.Request()
+        future = client.call_async(request)
+
+        def on_result(future):
+            ros_msg = String()
+
+            if future.result() is not None:
+                self.get_logger().info(f'clean_error success: {future.result().ret}')
+                ros_msg.data = f'clean_error success: {future.result().ret}'
+            else:
+                self.get_logger().error('clean_error service call failed')
+                ros_msg.data = 'clean_error service call failed'
             
+            self.output_pub.publish(ros_msg)
+
+        #when the service is completed, exec on_result()
+        future.add_done_callback(on_result)
+        
+        return
+    
+    def call_clean_warning(self):
+        
+        client = self.create_client(Call, '/ufactory/clean_warn')
+        
+        if not client.wait_for_service(timeout_sec=5.0):
+            self.get_logger().error('clean_error service not avaliable')
+            return
+        
+        request = Call.Request()
+        future = client.call_async(request)
+
+        def on_result(future):
+            ros_msg = String()
+
+            if future.result() is not None:
+                self.get_logger().info(f'clean_warn success: {future.result().ret}')
+                ros_msg.data = f'clean_warn success: {future.result().ret}'
+            else:
+                self.get_logger().error('clean_warn service call failed')
+                ros_msg.data = 'clean_warn service call failed'
+            
+            self.output_pub.publish(ros_msg)
+
+        #when the service is completed, exec on_result()
+        future.add_done_callback(on_result)
+        
+        return
+
     def call_home_service(self):
         from xarm_msgs.srv import MoveHome
 
