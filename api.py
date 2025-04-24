@@ -1,5 +1,6 @@
 import socket
 import time
+import json
 
 class ROSBridgeClient:
     def __init__(self, host='localhost', port=3000):
@@ -45,12 +46,45 @@ class ROSBridgeClient:
 
 if __name__ == "__main__":
     client = ROSBridgeClient()
+
+    #NOTE: add more commands with arguments
+    commands = {
+        "move": {"args": ["x","y","z"]},
+        "home": {"args": []},
+        "position": {"args": []}
+    }
+
     try:
         client.connect()
         while True:
-            msg = input("Enter a message to send (or 'exit'): ")
-            if msg.lower() == 'exit':
+            userInput = input("Enter a message to send (or 'exit'): ")
+            if userInput.lower() == 'exit' or userInput == "":
                 break
+
+            #split the string 
+            split = userInput.split(" ")
+
+            #1st arg is the cmd name
+            cmd = split[0]
+
+            if cmd not in commands:
+                print(f"Unknown command: {cmd}")
+                continue
+            
+            input_data  = {"cmd": cmd}
+
+            #take in the required args as list
+            required_args = commands[cmd]["args"]
+
+            # check to see if the length vs args list
+            if len(split)-1 != len(required_args):
+                print(f"Command {cmd} requires {len(required_args)} arguments: {required_args}")
+                continue
+            
+            input_data["args"] = split[1:] if len(split) > 1 else []
+            
+            #any other args based on " "
+            msg = json.dumps(input_data)
             client.send_message(msg)
     finally:
         client.close()
