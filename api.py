@@ -2,6 +2,9 @@ import socket
 import time
 import json
 
+#TODO: Take in JSON responses
+#TODO: have error responses be more fleshed out
+
 class ROSBridgeClient:
     def __init__(self, host='localhost', port=3000):
         self.host = host
@@ -49,9 +52,11 @@ if __name__ == "__main__":
 
     #NOTE: add more commands with arguments
     commands = {
-        "move": {"args": ["x","y","z"]},
+        "move": {"args": ["x","y","z","speed","acc","mvtime"]}, #input: float32[] x,y,z
         "home": {"args": []},
-        "position": {"args": []},
+        "position": {"args": []}, 
+        "angle": {"args": []},
+        "move_joint": {"args": ["j1","j2","j3","j4","j5","j6","speed","acc","mvtime"]}, #input: float32[] angles j1-j6
         "clean_error": {"args":[]},
         "clean_warn": {"args":[]}
     }
@@ -59,9 +64,11 @@ if __name__ == "__main__":
     try:
         client.connect()
         while True:
-            userInput = input("Enter a message to send (or 'exit'): ")
+            userInput = input("Enter a message to send ('help', or 'exit'): ")
             if userInput.lower() == 'exit' or userInput == "":
                 break
+            elif userInput.lower() == 'help':
+                print(commands)
 
             #split the string 
             split = userInput.split(" ")

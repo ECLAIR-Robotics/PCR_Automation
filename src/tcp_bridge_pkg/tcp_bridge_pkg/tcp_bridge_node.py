@@ -2,11 +2,15 @@ import socket
 import threading
 import rclpy
 import json
+import sys
 from rclpy.node import Node
 from std_msgs.msg import String
 from xarm_msgs.msg import RobotMsg
 from xarm_msgs.srv import Call
 
+#TODO: send JSON responses
+#TODO: we return an error code when we actually run into issues
+#TODO: set the robot mode and 
 
 class TCPBridgeNode(Node):
     def __init__(self):
@@ -79,9 +83,15 @@ class TCPBridgeNode(Node):
                     #evoke handle
                     self.call_position_service()
 
+                elif input["cmd"] == 'angle':
+                    self.call_angle_service()
+
                 elif input["cmd"] == 'move':
                     #parse "move x y z" fmt
                     self.call_move_service(input["args"])
+
+                elif input["cmd"] == 'move_joint':
+                    self.call_joint_service(input["args"])
                 
                 elif input["cmd"] == 'clean_error':
                     self.call_clean_error()
@@ -201,7 +211,27 @@ class TCPBridgeNode(Node):
         
         return 
 
-    def call_move_service(self,*args):
+    def call_angle_service(self):
+        if self.current_pose is None:
+            self.get_logger().error('No position data avaliable')
+            return
+        
+        if hasattr(self,'conn'):
+            try:
+                angle = self.current_angles
+
+                state_msg = (
+                f"Angle: j1={angle[0]:.2f}, j2={angle[1]:.2f}, j3={angle[2]:.2f}, j4={angle[3]:.2f}, j5={angle[4]:.2f}, j6={angle[5]:.2f}\n"
+                )
+
+                self.conn.sendall(state_msg.encode())
+                self.get_logger().info('Sent angle data to client')
+            except Exception as e: 
+                self.get_logger().error(f'Failed to send angle data: {e}')
+        
+        return
+
+    def call_move_service(self,args):
         from xarm_msgs.srv import MoveCartesian
 
         client = self.create_client(MoveCartesian, '/ufactory/set_position')
@@ -211,7 +241,7 @@ class TCPBridgeNode(Node):
         
         # numbers passed from json are supposed to floats
         try:
-            x,y,z = map(float,args) 
+            x,y,z,speed,acc,mvtime = map(float,args) 
         except (ValueError, TypeError) as e:
             self.get_logger().error(f'Invalid coordinates provided: {e}')
             if hasattr(self, 'conn'):
@@ -220,9 +250,9 @@ class TCPBridgeNode(Node):
         
         request = MoveCartesian.Request()
         request.pose = [x, y, z, 3.14, 0.0, 0.0]
-        request.speed = 100.0
-        request.acc = 10.0
-        mvtime = 0.0
+        request.speed = speed
+        request.acc = acc
+        request.mvtime = mvtime
 
         future = client.call_async(request)
 
@@ -240,12 +270,50 @@ class TCPBridgeNode(Node):
 
         future.add_done_callback(on_result)
 
+    def call_joint_service(self,args):
+        from xarm_msgs.srv import MoveJoint
+
+        client = self.create_client(MoveJoint, '/ufactory/set_servo_angle_j')
+        if not client.wait_for_service(timeout_sec=5.0):
+            self.get_logger().error('set_servo_angle_j service not available')
+            return
+        
+        try:
+            *joint_angles, speed, acc, mvtime = map(float, args)
+        except (ValueError, TypeError) as e:
+            self.get_logger().error(f'Invalid arguments provided: {e}')
+            if hasattr(self, 'conn'):
+                error_msg = f"Error: arguments must be numbers\n"
+                self.output_pub.publish(error_msg.encode())
+        
+        request = MoveJoint.Request()
+        request.angles = joint_angles
+        request.speed = 15.0 #NOTE change to something with trial and error
+        request.acc = 10.0 #NOTE change
+        request.mvtime = 0.0 #NOTE change
+
+        future = client.call_async(request)
+
+        def on_result(future):
+            ros_msg = String()
+
+            if future.result() is not None:
+                self.get_logger().info(f'set_servo_angle_j success {future.result().ret}')
+                ros_msg.data = f'set_servo_angle_j success {future.result().ret}'
+            else:
+                self.get_logger().error('set_servo_angle_j service call failed')
+                ros_msg.data = 'set_servo_angle_j service call failed'
+            
+            self.output_pub.publish(ros_msg)
+
+        future.add_done_callback(on_result)
+
     # Subscriber Actions
 
     def robot_state_callback(self, msg: RobotMsg):
         # update our values, only send when client requests them
-        self.current_pose = msg.pose
-        self.current_angles = msg.angle
+        self.current_pose = msg.pose #NOTE expressed in mm(position), radian(orientation) 
+        self.current_angles = msg.angle #NOTE: radians
         
 
     def ros_to_socket_callback(self, msg):
@@ -258,16 +326,42 @@ class TCPBridgeNode(Node):
             except Exception as e:
                 self.get_logger().error(f"Socket send error: {e}")
 
+def cleanup(node):
+    print("\nCleaning up...")
+    
+    # Close TCP connection if it exists
+    if hasattr(node, 'conn') and node.conn:
+        try:
+            node.conn.close()
+            print("TCP connection closed")
+        except Exception as e:
+            print(f"Error closing TCP connection: {e}")
+    
+    # Close server socket if it exists
+    if hasattr(node, 'sock') and node.sock:
+        try:
+            node.sock.close()
+            print("Server socket closed")
+        except Exception as e:
+            print(f"Error closing server socket: {e}")
+    
+    # Cleanup ROS node
+    try:
+        node.destroy_node()
+        rclpy.shutdown()
+        print("ROS node shut down")
+    except Exception as e:
+        print(f"Error during ROS shutdown: {e}")
+    
+    sys.exit(0)
 
 def main(args=None):
     rclpy.init(args=args)
     node = TCPBridgeNode()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
-    node.destroy_node()
-    rclpy.shutdown()
+    finally:
+        cleanup(node)
 
 
 if __name__ == '__main__':
