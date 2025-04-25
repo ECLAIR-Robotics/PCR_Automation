@@ -162,13 +162,17 @@ class TCPBridgeNode(Node):
         #subfunction that we will pass to callback()
         def on_result(future):
             ros_msg = String()
-
+            ros_dict = {"cmd": "set_mode"}
             if future.result() is not None:
                 self.get_logger().info(f'SetInt16 success: {future.result().ret}')
-                ros_msg.data = f'set mode success: {future.result().ret}'
+                ros_dict["ret"] = future.result().ret
+                ros_dict["message"] = future.result().ret
             else:
                 self.get_logger().error('SetInt16 service call failed')
-                ros_msg.data = 'set mode service call failed'
+                ros_dict["ret"] = -1
+                ros_dict["message"] = 'set mode service call failed'
+            
+            ros_msg.data = json.dumps(ros_dict)
 
             self.output_pub.publish(ros_msg)
 

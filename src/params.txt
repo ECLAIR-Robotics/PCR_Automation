@@ -99,8 +99,8 @@
   services.set_impedance
   services.set_impedance_config
   services.set_impedance_mbk
-  services.set_joint_jerk 
-  services.set_joint_maxacc
+  services.set_joint_jerk #KEY
+  services.set_joint_maxacc #KEY
   services.set_linear_track_back_origin
   services.set_linear_track_enable
   services.set_linear_track_pos
@@ -126,10 +126,10 @@
   services.set_servo_detach
   services.set_simulation_robot
   services.set_state
-  services.set_tcp_jerk
-  services.set_tcp_load
-  services.set_tcp_maxacc
-  services.set_tcp_offset
+  services.set_tcp_jerk #KEY
+  services.set_tcp_load #KEY 
+  services.set_tcp_maxacc #KEY
+  services.set_tcp_offset #KEY
   services.set_teach_sensitivity
   services.set_tgpio_digital
   services.set_tgpio_digital_with_xyz
