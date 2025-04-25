@@ -54,6 +54,8 @@ commands = {
     "position": {"args": []}, 
     "angle": {"args": []},
     "move_joint": {"args": ["j1","j2","j3","j4","j5","j6","speed","acc","mvtime"]}, #input: float32[] angles j1-j6
+    "get_joint_velocity": {"args": []},
+    "set_joint_velocity": {"args": ["j1","j2","j3","j4","j5","j6"]},
     "clean_error": {"args":[]},
     "clean_warn": {"args":[]},
     "get_state": {"args":[]},

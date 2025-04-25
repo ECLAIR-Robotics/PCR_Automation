@@ -8,6 +8,7 @@ from std_msgs.msg import String
 from xarm_msgs.msg import RobotMsg
 from xarm_msgs.srv import Call
 from xarm_msgs.srv import SetInt16
+from sensor_msgs.msg import JointState
 
 #TODO: send JSON responses
 #TODO: we return an error code when we actually run into issues
@@ -33,8 +34,15 @@ class TCPBridgeNode(Node):
             '/ufactory/robot_states',
             self.robot_state_callback,
             10)
+
+        # Subscriber node that monitors for the joint state topic
+        self.joint_sub = self.create_subscription(JointState,
+            '/ufactory/joint_states',
+            self.joint_state_callback,
+            10)
         
-        self.robo_info = None #dict containing our entire robot state
+        self.robo_info = None #dict containing our robot state
+        self.joint_info = None #dict containing our joint state
 
 
         # TCP server setup
@@ -103,6 +111,12 @@ class TCPBridgeNode(Node):
 
             elif cmd == 'move_joint':
                 self.call_joint_service(args)
+            
+            elif cmd == 'get_joint_velocity':
+                self.call_get_joint_velocity_service()
+
+            elif cmd == 'set_joint_velocity':
+                self.call_set_joint_velocity_service(args)
             
             elif cmd == 'clean_error':
                 self.call_clean_error()
@@ -345,7 +359,8 @@ class TCPBridgeNode(Node):
                 angle = self.robo_info["angle"]
 
                 state_msg = (
-                f"Angle: j1={angle[0]:.2f}, j2={angle[1]:.2f}, j3={angle[2]:.2f}, j4={angle[3]:.2f}, j5={angle[4]:.2f}, j6={angle[5]:.2f}\n"
+                f"Angle: j1={angle[0]:.2f}, j2={angle[1]:.2f}, j3={angle[2]:.2f}\n"
+                f"Angle: j4={angle[3]:.2f}, j5={angle[4]:.2f}, j6={angle[5]:.2f}\n"
                 )
 
                 self.conn.sendall(state_msg.encode())
@@ -354,6 +369,64 @@ class TCPBridgeNode(Node):
                 self.get_logger().error(f'Failed to send angle data: {e}')
         
         return
+    
+    def call_get_joint_velocity_service(self):
+        if self.joint_info is None:
+            self.get_logger().error('No joint velocity data avaliable')
+            return
+        
+        if hasattr(self,'conn'):
+            try:
+                velocity = self.joint_info["velocity"]
+
+                state_msg = (
+                f"Velocity: j1={velocity[0]:.2f}, j2={velocity[1]:.2f}, j3={velocity[2]:.2f}\n"
+                f"Velocity: j4={velocity[0]:.2f}, j5={velocity[1]:.2f}, j6={velocity[2]:.2f}\n"
+                )
+
+                self.conn.sendall(state_msg.encode())
+                self.get_logger().info('Sent position data to client')
+            except Exception as e: 
+                self.get_logger().error(f'Failed to send position data: {e}')
+        
+        return 
+
+    def call_set_joint_velocity_service(self, args):
+        from xarm_msgs.srv import MoveVelocity
+
+        client = self.create_client(MoveVelocity, '/ufactory/vc_set_joint_velocity')
+        if not client.wait_for_service(timeout_sec=5.0):
+            self.get_logger().error('vc_set_joint_velocity service not available')
+            return
+
+        try:
+            velocities = list(map(float, args))
+            request = MoveVelocity.Request()
+            request.speeds = velocities  # Array of 6 joint velocities
+            
+            future = client.call_async(request)
+            
+        except ValueError as e:
+            self.get_logger().error(f'Invalid velocity parameters: {e}')
+        
+        request = MoveVelocity.Request()
+        request.speeds = velocities
+
+        future = client.call_async(request)
+
+        def on_result(future):
+            ros_msg = String()
+
+            if future.result() is not None:
+                self.get_logger().info(f'vc_set_joint_velocity success {future.result().ret}')
+                ros_msg.data = f'vc_set_joint_velocity success {future.result().ret}'
+            else:
+                self.get_logger().error('vc_set_joint_velocity service call failed')
+                ros_msg.data = 'vc_set_joint_velocity service call failed'
+            
+            self.output_pub.publish(ros_msg)
+
+        future.add_done_callback(on_result)
 
     def call_move_service(self,args):
         from xarm_msgs.srv import MoveCartesian
@@ -412,9 +485,12 @@ class TCPBridgeNode(Node):
         
         request = MoveJoint.Request()
         request.angles = joint_angles
-        request.speed = 15.0 #NOTE change to something with trial and error
-        request.acc = 10.0 #NOTE change
-        request.mvtime = 0.0 #NOTE change
+        request.speed = speed
+        request.acc = acc
+        request.mvtime = mvtime
+
+        self.get_logger().info(f'speed {speed}')
+        self.get_logger().info(f'speed {acc}')
 
         future = client.call_async(request)
 
@@ -447,6 +523,14 @@ class TCPBridgeNode(Node):
             "angle": msg.angle,
             "pose": msg.pose,
             "offset": msg.offset
+        }
+    
+    def joint_state_callback(self,msg: JointState):
+        self.joint_info = {
+            "name": msg.name,
+            "position": msg.position,
+            "velocity": msg.velocity,
+            "effort": msg.effort
         }
         
 
