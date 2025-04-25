@@ -302,6 +302,70 @@ def transform_point_relative_to_tag0(tag0_pose, tag0_center, target_point_world,
 
     return dx, dy, angle_deg
 
+def set_up_birds_eye(camera_number, tagSize):
+    cap = initialize_camera(camera_number)
+    _, mtx, _, _, _ = calibrate(cap)
+    detector, estimator, mtx = initialize_detector_and_estimator(mtx, tagSize)
+
+    return cap, detector, estimator, mtx
+
+def get_x_and_y_for_tag(cap, detector, estimator, offset_distance_m, mtx, tagNumber, max_frames=10):
+    frame_count = 0
+
+    try:
+        while frame_count < max_frames:
+            # Read a frame from the webcam
+            ret, frame = cap.read()
+            if not ret:
+                print("Failed to grab frame")
+                break
+
+            _, _, _, apriltags, _ = process_image(frame, detector)
+            center_and_pose = process_apriltag(apriltags, estimator, frame)
+
+            if tagNumber == 1 and center_and_pose[0] and center_and_pose[1]:
+                r1 = R.from_euler('xyz', [center_and_pose[1][1].rotation().x,
+                                          center_and_pose[1][1].rotation().y,
+                                          center_and_pose[1][1].rotation().z])
+                y_axis_neg = -r1.as_matrix()[:, 1]
+                translation1 = np.array(center_and_pose[1][1].translation())
+                new_point_world = translation1 + offset_distance_m * y_axis_neg
+                translation0 = np.array(center_and_pose[0][1].translation())
+                dx2, dy2, angle = transform_point_relative_to_tag0(
+                    center_and_pose[0][1],
+                    translation0[:2],
+                    new_point_world[:2],
+                    mtx,
+                    frame
+                )
+                return -dy2, -dx2
+
+            if tagNumber == 2 and center_and_pose[0] and center_and_pose[2]:
+                r2 = R.from_euler('xyz', [center_and_pose[2][1].rotation().x,
+                                          center_and_pose[2][1].rotation().y,
+                                          center_and_pose[2][1].rotation().z])
+                y_axis_neg_2 = -r2.as_matrix()[:, 1]
+                translation2 = np.array(center_and_pose[2][1].translation())
+                new_point_world_2 = translation2 + offset_distance_m * y_axis_neg_2
+                translation0 = np.array(center_and_pose[0][1].translation())
+                dx3, dy3, angle2 = transform_point_relative_to_tag0(
+                    center_and_pose[0][1],
+                    translation0[:2],
+                    new_point_world_2[:2],
+                    mtx,
+                    frame
+                )
+                return -dy3, -dx3
+
+            cv2.imshow('Video Feed', frame)
+            frame_count += 1
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+    finally:
+        cap.release()
+        cv2.destroyAllWindows()
+
 def main():
     tagSize = 0.061 # in meters
     offset_distance_cm = 7.4 # in centimeters

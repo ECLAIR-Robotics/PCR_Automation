@@ -37,3 +37,54 @@
 # 12. CALL EJECT_LIQUID FROM HARDWARE
 
 # 13. MAKE ARM GO UP
+
+from computer_vision.birds_eye_view.overhead2.birdseyeview import (
+    set_up_birds_eye,
+    get_x_and_y_for_tag,
+)
+
+def main():
+    # Setting up birds eye view code
+    tagSize = 0.061 # in meters
+    camera_number = 0 
+    offset_distance_cm = 7.4 # in centimeters
+    offset_distance_m = offset_distance_cm / 100  # Convert to meters
+    cap, detector, estimator, mtx = set_up_birds_eye(camera_number, tagSize)
+
+    referenceX = 0
+    referenceY = 0
+
+    # Move off to side first so we get a clear view of everything
+    # INSERT CODE HERE
+
+    # Get locations of two beakers
+    x1, y1 = get_x_and_y_for_tag(cap, detector, estimator, offset_distance_m, mtx, 1, 20)
+    x1 = x1 + referenceX
+    y1 = y1 + referenceY
+    x2, y2 = get_x_and_y_for_tag(cap, detector, estimator, offset_distance_m, mtx, 2, 20)
+    x2 = x2 + referenceX
+    y2 = y2 + referenceY
+
+    # Move to beaker 1 + move down
+    # INSERT CODE HERE
+
+    # Plunge down and intake liquid
+    # INSERT CODE HERE
+
+    # Move up from beaker
+    # INSERT CODE HERE
+
+    # Move to beaker 2 + move down
+    # INSERT CODE HERE
+
+    # Plunge down and eject liquid
+    # INSERT CODE HERE
+
+    # Move up from beaker
+    # INSERT CODE HERE
+
+    # Move to 
+
+
+if __name__ == "__main__":
+    main()
