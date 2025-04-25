@@ -32,8 +32,8 @@ class TCPBridgeNode(Node):
             self.robot_state_callback,
             10)
         
-        self.current_pose = None
-        self.current_angles = None
+        self.robo_info = None #dict containing our entire robot state
+
 
         # TCP server setup
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -190,14 +190,14 @@ class TCPBridgeNode(Node):
         future.add_done_callback(on_result)
 
     def call_position_service(self):
-        if self.current_pose is None:
+        if self.robo_info is None:
             self.get_logger().error('No position data avaliable')
             return
         
         if hasattr(self,'conn'):
             try:
-                position = self.current_pose[:3]
-                rotation = self.current_pose[3:]
+                position = self.robo_info["pose"][:3]
+                rotation = self.robo_info["pose"][3:]
 
                 state_msg = (
                 f"Position: x={position[0]:.2f}, y={position[1]:.2f}, z={position[2]:.2f}\n"
@@ -212,13 +212,13 @@ class TCPBridgeNode(Node):
         return 
 
     def call_angle_service(self):
-        if self.current_pose is None:
+        if self.robo_info is None:
             self.get_logger().error('No position data avaliable')
             return
         
         if hasattr(self,'conn'):
             try:
-                angle = self.current_angles
+                angle = self.robo_info["angle"]
 
                 state_msg = (
                 f"Angle: j1={angle[0]:.2f}, j2={angle[1]:.2f}, j3={angle[2]:.2f}, j4={angle[3]:.2f}, j5={angle[4]:.2f}, j6={angle[5]:.2f}\n"
@@ -312,8 +312,18 @@ class TCPBridgeNode(Node):
 
     def robot_state_callback(self, msg: RobotMsg):
         # update our values, only send when client requests them
-        self.current_pose = msg.pose #NOTE expressed in mm(position), radian(orientation) 
-        self.current_angles = msg.angle #NOTE: radians
+        self.robo_info = {
+            "state": msg.state,
+            "mode": msg.mode,
+            "cmdnum": msg.cmdnum,
+            "mt_brake": msg.mt_brake,
+            "mt_able": msg.mt_able,
+            "err": msg.err,
+            "warn": msg.warn,
+            "angle": msg.angle,
+            "pose": msg.pose,
+            "offset": msg.offset
+        }
         
 
     def ros_to_socket_callback(self, msg):
@@ -348,7 +358,6 @@ def cleanup(node):
     # Cleanup ROS node
     try:
         node.destroy_node()
-        rclpy.shutdown()
         print("ROS node shut down")
     except Exception as e:
         print(f"Error during ROS shutdown: {e}")
@@ -362,6 +371,7 @@ def main(args=None):
         rclpy.spin(node)
     finally:
         cleanup(node)
+        rclpy.shutdown()
 
 
 if __name__ == '__main__':
