@@ -1,126 +1,102 @@
-#!/usr/bin/env python3
-import os
+# main program!!
+# beforehand: 
+# fill beakers to 5 oz
+# adjust arduino com in arduino IDE
+
+# pseudocode in comments
+
+# 1. CALIBRATE
+# find focal length of camera
+
+# LOOP THE FOLLOWING:
+
+# 2. FIND APRIL TAG 0 AND 1
+# function that takes in april tag ID
+
+# 3. CALCULATE DISTANCE
+# function that calculates distance between april tags
+
+# 4. MOVE ARM TO APRIL TAG 1
+# function that moves arm given set distance
+# distance from arm to 0 is hard-coded
+
+# 5. MAKE ARM GO DOWN [HARD-CODED MM]
+
+# 6. CALL GET_LIQUID FROM HARDWARE
+
+# 7. MAKE ARM GO UP [HARD-CODED MM]
+
+# 8. FIND APRIL TAG 0 AND 2
+
+# 9. CALCULATE DISTANCE
+
+# 10. MOVE ARM TO APRIL TAG 2
+
+# 11. MAKE ARM GO DOWN
+
+# 12. CALL EJECT_LIQUID FROM HARDWARE
+
+# 13. MAKE ARM GO UP
+
 import sys
-import time
-import json
-import argparse
-from mypy_types import RequestDict
-import logging
-from pcr.gizzmos import AtalantaModule
+import os
+import hardware
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from xarm.wrapper import XArmAPI
-from gizzmos import CustomGripper, PressureSensor
+from computer_vision.birds_eye_view.overhead2.birdseyeview import (
+    set_up_birds_eye,
+    get_x_and_y_for_tag,
+)
 
-class RunJob():
-    SPEED = 50
-    ZERO_POS   = [0, 0, 0, 0, 0, 0]
-    GIZMO_POS  = [0, 9.9, 31.8, 0, -70, 0]
-    INTIAL_POS = [0, 9.9, 31.8, 0, -70, 0]
+def main():
+    # Setting up birds eye view code
+    tagSize = 0.061 # in meters
+    camera_number = 0 
+    offset_distance_cm = 7.4 # in centimeters
+    offset_distance_m = offset_distance_cm / 100  # Convert to meters
+    cap, detector, estimator, mtx = set_up_birds_eye(camera_number, tagSize)
 
-    def __init__(self, arm: XArmAPI, data: RequestDict) -> None:
-        self.arm = arm
-        self.verify_inputs(data)
-        
-        self.job_id        = data['job_id']
-        self.cycles        = data['cycles']
-        self.reactants     = data['reactants']
-        self.thermal_times = data['times']
+    referenceX = 0
+    referenceY = 0
 
-        self.gripper  = CustomGripper(arm)
-        self.atalanta = AtalantaModule()
+    while True:
+        # Move off to side first so we get a clear view of everything
+        # INSERT CODE HERE
 
-    def verify_inputs(self, data: RequestDict) -> None:
-        # Check if the brand of thermal cycler and micropipette is currently supported
-        if data['micropipette'] != 'eppendorf' or data['thermal_cycler'] != 'Thermo Fischer Scientific':
-            msg = 'JSON data is invalid'
-            logging.error(msg)
-            raise Exception(msg)
+        # Get locations of two beakers
+        x1, y1 = get_x_and_y_for_tag(cap, detector, estimator, offset_distance_m, mtx, 1, 20)
+        x2, y2 = get_x_and_y_for_tag(cap, detector, estimator, offset_distance_m, mtx, 2, 20)
+        if x1 is None or x2 is None:
+            continue
+        x1 = x1 + referenceX
+        y1 = y1 + referenceY
+        print(x1)
+        print(y1)
+        x2 = x2 + referenceX
+        y2 = y2 + referenceY
+        print(x2)
+        print(y2)
 
-    def run(self) -> None:
-        # Run a new PCR job
-        self.arm.set_servo_angle(angle=self.INTIAL_POS, speed=self.SPEED, wait=True)
-        self.grab_test_tube()
-        self.place_tube_in_rack()
-        self.grab_pipette()
+        # Move to beaker 1 + move down
+        # INSERT CODE HERE
 
-        # Acquire the different reactants and their respective volumes
-        for reactant in self.reactants:
-            name   = reactant['name']
-            volume = reactant['quantity']
+        # Plunge down and intake liquid
+        # INSERT CODE HERE
+        hardware.get_liquid()
 
-            amt, units = volume.split(' ')
+        # Move up from beaker
+        # INSERT CODE HERE
 
-            if units == 'ul':
-                amt = int(amt)
-            elif units == 'ml':
-                amt = int(amt)
-                amt *= 100
-            else:
-                msg = f'Could not interpret volume of {volume}'
-                logging.error(msg)
-                raise Exception(msg)
+        # Move to beaker 2 + move down
+        # INSERT CODE HERE
 
-            logging.info(f'Attempting to acquire {volume} of {name}')
-            self.adjust_volume(amt)
+        # Plunge down and eject liquid
+        # INSERT CODE HERE
+        hardware.eject_liquid()
 
-            # Get the tip, obtain the right volume, go to test tube, deposit the
-            # reactant, and drop the pipette tip
-            self.attach_pipette_tip()
-            self.move_to_reactant(reactant['location'])
-            self.gripper.fill_pipette()
-            self.move_to_test_tube()
-            self.gripper.remove_pipette_tip()
-
-        self.arm.set_servo_angle(angle=self.ZERO_POS, speed=self.SPEED, wait=True)
-
-    def grab_test_tube(self) -> None:
-        time.sleep(5)
-        pass
-
-    def move_to_test_tube(self) -> None:
-        pass
-
-    def place_tube_in_rack(self) -> None:
-        self.move_to_test_tube()
-        pass
-
-    def grab_pipette(self) -> None:
-        pass
-
-    def adjust_volume(self, volume: int) -> None:
-        err = self.atalanta.adjust_volume(volume)
-
-        if err is not None:
-            logging.error(err)
-            raise Exception(err)
-
-    def attach_pipette_tip(self) -> None:
-        pass
-
-    def move_to_reactant(reactant_idx: int) -> None:
-        pass
+        # Move up from beaker
+        # INSERT CODE HERE
 
 
-if __name__ == '__main__':
-    # Add xArm python modules to the PATH
-    sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-
-    # Parse through all the arguments
-    parser = argparse.ArgumentParser(description='Please add the configuration of the robotic arm needed at runtime')
-    parser.add_argument('--ip', '-i', default='192.168.1.166', help='IP address of the xArm6 Robotic Arm')
-    args = parser.parse_args()
-
-    data = RequestDict(json.load(open('test_inputs.json')))
-
-    # Create an xArm instance
-    arm = XArmAPI(args.ip)
-    arm.motion_enable(enable=True)
-    arm.set_mode(0)
-    arm.set_state(state=0)
-    arm.reset(wait=True)
-
-    job = RunJob(arm, data)
-    job.run()
-
-    arm.reset(wait=True)
-    arm.disconnect()
+if __name__ == "__main__":
+    main()

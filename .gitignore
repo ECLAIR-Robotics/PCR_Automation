@@ -10,6 +10,6 @@ computer_vision/number_detection/library/*
 !computer_vision/number_detection/library/
 .vscode/*
 venv/*
-src/build/
-src/install/
-src/log/
+src/install
+src/build
+src/log

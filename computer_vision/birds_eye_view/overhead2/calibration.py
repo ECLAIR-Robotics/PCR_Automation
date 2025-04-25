@@ -10,7 +10,8 @@ def calibrate(cap):
     num_photos = 15
     chess_points_vertical = 9
     chess_points_horizontal = 6
-    photo_directory = 'calibration_photos'  # Change this to your desired folder path
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    photo_directory = os.path.join(script_dir, 'calibration_photos')
 
     photos_found = True
     # photos_found = False
