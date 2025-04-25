@@ -90,7 +90,7 @@ def initialize_camera(camera_number) -> cv2.VideoCapture:
         exit()
     return cap
 
-def initialize_detector_and_estimator(mtx, tagFamily: str = "tag25h9"):
+def initialize_detector_and_estimator(mtx, tagSize, tagFamily: str = "tag25h9"):
     """
     Initializes the AprilTag detector and pose estimator using the provided camera.
 
@@ -110,7 +110,7 @@ def initialize_detector_and_estimator(mtx, tagFamily: str = "tag25h9"):
     # Configure the AprilTag pose estimator with camera intrinsic parameters
     config = robotpy_apriltag.AprilTagPoseEstimator.Config(
         # tagSize=0.0605,  # Size of the AprilTag in meters
-        tagSize=0.061,  # Size of the AprilTag in meters
+        tagSize=tagSize,  # Size of the AprilTag in meters
         fx=mtx[0, 0],  # Camera's focal length in the x-direction (pixels)
         fy=mtx[1, 1],  # Camera's focal length in the y-direction (pixels)
         cx=mtx[0, 2],  # Camera's principal point X-coordinate (pixels)
@@ -303,11 +303,14 @@ def transform_point_relative_to_tag0(tag0_pose, tag0_center, target_point_world,
     return dx, dy, angle_deg
 
 def main():
-    cap = initialize_camera(0)
-    _, mtx, _, _, _ = calibrate(cap)
-    detector, estimator, mtx = initialize_detector_and_estimator(mtx)
+    tagSize = 0.061 # in meters
+    offset_distance_cm = 7.4 # in centimeters
+    camera_number = 0 
 
-    offset_distance_cm = 7.4
+    cap = initialize_camera(camera_number)
+    _, mtx, _, _, _ = calibrate(cap)
+    detector, estimator, mtx = initialize_detector_and_estimator(mtx, tagSize)
+
     offset_distance_m = offset_distance_cm / 100  # Convert to meters
 
     try:
