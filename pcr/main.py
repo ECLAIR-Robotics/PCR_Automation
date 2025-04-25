@@ -1,4 +1,7 @@
 # main program!!
+# beforehand: 
+# fill beakers to 5 oz
+# adjust arduino com in arduino IDE
 
 # pseudocode in comments
 
