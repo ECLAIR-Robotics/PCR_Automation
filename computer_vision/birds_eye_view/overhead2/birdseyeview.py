@@ -276,32 +276,74 @@ def compute_real_world_coordinates(curr_averages, center, pose, mtx, frame):
 
     return irl_coords
 
-def finding_the_angle(frame, tuple_april, list_beaker, pose, mtx):
-    coord = []
+def compute_real_world_distance(curr_averages, center, pose, mtx, frame):
+    """
+    Computes real-world coordinates of detected circles based on AprilTag pose estimation.
+
+    Args:
+        curr_averages (list): List of detected circle centers and radii [(x, y, r), ...].
+        center (tuple): The detected center of the AprilTag (x, y).
+        pose (object): AprilTag pose estimation object.
+        mtx (numpy array): Camera matrix for intrinsic parameters.
+        frame (numpy array): Frame on which to overlay distance annotations.
+
+    Returns:
+        list: Real-world coordinates of detected circles.
+    """
+    irl_coords = []
+    
+    for (x, y, _) in curr_averages:
+        # Get the translation and rotation of the AprilTag
+        x_tag, y_tag, z_tag = pose.translation()
+        roll, pitch, yaw = pose.rotation().x, pose.rotation().y, pose.rotation().z
+
+        # Convert rotation angles into a rotation matrix
+        r = R.from_euler('xyz', [roll, pitch, yaw])
+        R_tag = r.as_matrix()
+        n = R_tag[:, 2]
+
+        # Compute real-world coordinates of the detected circles
+        r_dir = np.array([(x - mtx[0, 2]) / mtx[0, 0], (y - mtx[1, 2]) / mtx[1, 1], 1])
+        r_dir /= np.linalg.norm(r_dir)
+
+        p_camera = np.array([0, 0, 0])
+        t = np.dot(n, (np.array([x_tag, y_tag, z_tag]) - p_camera)) / np.dot(n, r_dir)
+        p_item = p_camera + t * r_dir
+        irl_coords.append(p_item)
+
+        distance = np.linalg.norm(p_item - np.array([x_tag, y_tag, z_tag]))
+
+        # Display the calculated distance
+        midpoint = ((center[0] + x) // 2, (center[1] + y) // 2)
+        cv2.putText(frame, f"Dist: {100*distance:.3f} cm", midpoint, 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
+        cv2.line(frame, center, (x, y), (255, 0, 0), thickness=2)
+
+    # Compute distances between detected circles
+    for (i1, val1), (i2, val2) in combinations(enumerate(irl_coords), 2):
+        distance = np.linalg.norm(np.array(val1) - np.array(val2))
+        cv2.putText(frame, f"Dist: {100*distance:.3f} cm", 
+                    (curr_averages[i1][0], curr_averages[i1][1]), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
+
+    return distance
+
+def finding_the_angle(frame, tuple_april, list_beaker, pose, mtx, distance):
     coord = compute_real_world_coordinates(list_beaker, tuple_april, pose, mtx, frame)
-    # x_april = tuple_april[0]
-    # y_april = tuple_april[1]
-    # x_beaker = list_beaker[0][0]
-    # y_beaker = list_beaker[0][1]
-    #return f"{coord}"
-
-    x1 = coord[0][0]  # 10.5
-    y1 = coord[0][1]  # 3.2
-    #z1 = coord[0][2]  # 1.0
-
-    x2 = coord[1][0]  # 12.1
-    y2 = coord[1][1]  # 4.8
-    #z2 = coord[1][2]  # 0.9
-
-    x_april = x1
-    y_april = y1
-    x_beaker = x2
-    y_beaker = y2
+    x_april = tuple_april[0]
+    y_april = tuple_april[1]
+    x_beaker = list_beaker[0][0]
+    y_beaker = list_beaker[0][1]
 
     
     perpendicular = abs(y_beaker - y_april)
     base = abs(x_beaker - x_april)
-
+    dist = compute_real_world_distance(list_beaker, tuple_april, pose, mtx, frame)
+    hypotenuse = math.sqrt(base**2 + perpendicular**2)
+   
+    dist_in_cm = dist * 100
+    perpendicular_in_cm = (perpendicular/hypotenuse) * dist_in_cm
+    base_in_cm = (base/hypotenuse) * dist_in_cm
 
     # Draw base (horizontal line)
     cv2.line(frame, (x_april, y_april), (x_beaker, y_april), (0, 255, 0), 2)  # Green line
@@ -310,11 +352,12 @@ def finding_the_angle(frame, tuple_april, list_beaker, pose, mtx):
     cv2.line(frame, (x_beaker, y_april), (x_beaker, y_beaker), (255, 0, 0), 2)  # Blue line
 
     # Display angle information
-    cv2.putText(frame, f"Base: {base}px", (x_april, y_april), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-    cv2.putText(frame, f"Perp: {perpendicular}px", (x_beaker, y_april), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
-    
-    print(f"This is perpendicular: {perpendicular}")
-    print(f"This is base: {base}")
+    cv2.putText(frame, f"Base: {base_in_cm}cm", (x_april, y_april), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+    cv2.putText(frame, f"Perp: {perpendicular_in_cm}cm", (x_beaker, y_april), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
+
+
+
+
 
 def main():
     num_circles = 1   # Number of circles being tracked
@@ -346,7 +389,7 @@ def main():
             # Calculate distances from the tag to detected circles
             if center and curr_averages:
                 irl_coords = compute_real_world_coordinates(curr_averages, center, pose, mtx, frame)
-                finding_the_angle(frame, center, curr_averages, pose, mtx)
+                finding_the_angle(frame, center, curr_averages, pose, mtx, irl_coords)
 
             cv2.imshow('Video Feed', frame)
 
