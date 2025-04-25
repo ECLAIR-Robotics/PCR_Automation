@@ -1,4 +1,4 @@
-from calibration import calibrate
+from .calibration import calibrate
 import cv2
 import numpy as np
 import robotpy_apriltag
@@ -363,8 +363,9 @@ def get_x_and_y_for_tag(cap, detector, estimator, offset_distance_m, mtx, tagNum
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
     finally:
-        cap.release()
         cv2.destroyAllWindows()
+    
+    return None, None
 
 def main():
     tagSize = 0.061 # in meters

@@ -38,6 +38,10 @@
 
 # 13. MAKE ARM GO UP
 
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from computer_vision.birds_eye_view.overhead2.birdseyeview import (
     set_up_birds_eye,
     get_x_and_y_for_tag,
@@ -54,36 +58,41 @@ def main():
     referenceX = 0
     referenceY = 0
 
-    # Move off to side first so we get a clear view of everything
-    # INSERT CODE HERE
+    while True:
+        # Move off to side first so we get a clear view of everything
+        # INSERT CODE HERE
 
-    # Get locations of two beakers
-    x1, y1 = get_x_and_y_for_tag(cap, detector, estimator, offset_distance_m, mtx, 1, 20)
-    x1 = x1 + referenceX
-    y1 = y1 + referenceY
-    x2, y2 = get_x_and_y_for_tag(cap, detector, estimator, offset_distance_m, mtx, 2, 20)
-    x2 = x2 + referenceX
-    y2 = y2 + referenceY
+        # Get locations of two beakers
+        x1, y1 = get_x_and_y_for_tag(cap, detector, estimator, offset_distance_m, mtx, 1, 20)
+        x2, y2 = get_x_and_y_for_tag(cap, detector, estimator, offset_distance_m, mtx, 2, 20)
+        if x1 is None or x2 is None:
+            continue
+        x1 = x1 + referenceX
+        y1 = y1 + referenceY
+        print(x1)
+        print(y1)
+        x2 = x2 + referenceX
+        y2 = y2 + referenceY
+        print(x2)
+        print(y2)
 
-    # Move to beaker 1 + move down
-    # INSERT CODE HERE
+        # Move to beaker 1 + move down
+        # INSERT CODE HERE
 
-    # Plunge down and intake liquid
-    # INSERT CODE HERE
+        # Plunge down and intake liquid
+        # INSERT CODE HERE
 
-    # Move up from beaker
-    # INSERT CODE HERE
+        # Move up from beaker
+        # INSERT CODE HERE
 
-    # Move to beaker 2 + move down
-    # INSERT CODE HERE
+        # Move to beaker 2 + move down
+        # INSERT CODE HERE
 
-    # Plunge down and eject liquid
-    # INSERT CODE HERE
+        # Plunge down and eject liquid
+        # INSERT CODE HERE
 
-    # Move up from beaker
-    # INSERT CODE HERE
-
-    # Move to 
+        # Move up from beaker
+        # INSERT CODE HERE
 
 
 if __name__ == "__main__":
