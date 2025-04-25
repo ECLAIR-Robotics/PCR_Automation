@@ -95,13 +95,16 @@ class TCPBridgeNode(Node):
                 break
 
     def call_service(self, cmd, args):
+            #VISHAL
             if cmd == 'home':
                 self.call_home_service()
 
+            #VISHAL
             elif cmd == 'position':
                 #evoke handle
                 self.call_position_service()
 
+            #VISHAL
             elif cmd == 'angle':
                 self.call_angle_service()
 
@@ -188,14 +191,19 @@ class TCPBridgeNode(Node):
         #subfunction that we will pass to callback()
         def on_result(future):
             ros_msg = String()
+            ros_dict = {"cmd": "set_state"}
 
             if future.result() is not None:
                 self.get_logger().info(f'SetInt16 success: {future.result().ret}')
-                ros_msg.data = f'set state success: {future.result().ret}'
+                ros_dict["ret"] = future.result().ret
+                ros_dict["message"] = future.result().message
+                
             else:
                 self.get_logger().error('SetInt16 service call failed')
-                ros_msg.data = 'set mode service call failed'
+                ros_dict["ret"] = -1
+                ros_dict["message"] = future.result().message
 
+            ros_msg.data = json.dumps(ros_dict)
             self.output_pub.publish(ros_msg)
 
         future.add_done_callback(on_result)
@@ -209,9 +217,9 @@ class TCPBridgeNode(Node):
             try:
                 mode = self.robo_info["mode"]
 
-                state_msg = (
-                f"Mode: {mode}\n"
-                )
+                state_dict = {"cmd": "get_mode"}
+                state_dict["mode"] = mode
+                state_msg = json.dumps(state_dict)
 
                 self.conn.sendall(state_msg.encode())
                 self.get_logger().info('Sent mode data to client')
@@ -225,14 +233,14 @@ class TCPBridgeNode(Node):
         if self.robo_info is None:
             self.get_logger().error('No data on mode avaliable')
             return
-         
+
         if hasattr(self,'conn'):
             try:
                 state = self.robo_info["state"]
 
-                state_msg = (
-                f"Mode: {state}\n"
-                )
+                state_dict = {"cmd": "get_state"}
+                state_dict["state"] = state
+                state_msg = json.dumps(state_dict)
 
                 self.conn.sendall(state_msg.encode())
                 self.get_logger().info('Sent state data to client')
@@ -253,14 +261,18 @@ class TCPBridgeNode(Node):
 
         def on_result(future):
             ros_msg = String()
+            ros_dict = {"cmd": "clean_error"}
 
             if future.result() is not None:
                 self.get_logger().info(f'clean_error success: {future.result().ret}')
-                ros_msg.data = f'clean_error success: {future.result().ret}'
+                ros_dict["ret"] = future.result().ret
+                ros_dict["message"] = future.result().message
             else:
                 self.get_logger().error('clean_error service call failed')
-                ros_msg.data = 'clean_error service call failed'
-            
+                ros_dict["ret"] = -1
+                ros_dict["message"] = 'clean_error service call failed'
+                
+            ros_msg.data = json.dumps(ros_dict)
             self.output_pub.publish(ros_msg)
 
         #when the service is completed, exec on_result()
@@ -281,14 +293,19 @@ class TCPBridgeNode(Node):
 
         def on_result(future):
             ros_msg = String()
+            ros_dict = {"cmd": "clean_warning"}
 
             if future.result() is not None:
                 self.get_logger().info(f'clean_warn success: {future.result().ret}')
-                ros_msg.data = f'clean_warn success: {future.result().ret}'
+                ros_dict["ret"] = future.result().ret
+                ros_dict["message"] = future.result().message
+                
             else:
                 self.get_logger().error('clean_warn service call failed')
-                ros_msg.data = 'clean_warn service call failed'
+                ros_dict["ret"] = -1
+                ros_dict["message"] = 'clean_warn service call failed'
             
+            ros_msg.data = json.dumps(ros_dict)
             self.output_pub.publish(ros_msg)
 
         #when the service is completed, exec on_result()
@@ -313,15 +330,21 @@ class TCPBridgeNode(Node):
 
         #subfunction that we will pass to callback()
         def on_result(future):
+            # create dictionary
+            ros_dict = {"cmd": "home"}
+            
             ros_msg = String()
 
             if future.result() is not None:
                 self.get_logger().info(f'MoveHome success: {future.result().ret}')
-                ros_msg.data = f'MoveHome success: {future.result().ret}'
+                ros_dict['ret'] = future.result().ret
+                ros_dict['message'] = future.result().message
             else:
                 self.get_logger().error('MoveHome service call failed')
-                ros_msg.data = 'MoveHome service call failed'
-            
+                ros_dict['ret'] = -1
+                ros_dict['message'] = 'MoveHome service call failed'
+                
+            ros_msg.data = json.dumps(ros_dict)
             self.output_pub.publish(ros_msg)
 
         #when the service is completed, exec on_result()
@@ -336,11 +359,13 @@ class TCPBridgeNode(Node):
             try:
                 position = self.robo_info["pose"][:3]
                 rotation = self.robo_info["pose"][3:]
+                
+                state_dict = {"cmd": "position"}
 
-                state_msg = (
-                f"Position: x={position[0]:.2f}, y={position[1]:.2f}, z={position[2]:.2f}\n"
-                f"Rotation: r={rotation[0]:.2f}, p={rotation[1]:.2f}, y={rotation[2]:.2f}\n"
-                )
+                state_dict["position"] = position
+                state_dict["rotation"] = rotation
+
+                state_msg = json.dumps(state_dict)
 
                 self.conn.sendall(state_msg.encode())
                 self.get_logger().info('Sent position data to client')
@@ -358,10 +383,10 @@ class TCPBridgeNode(Node):
             try:
                 angle = self.robo_info["angle"]
 
-                state_msg = (
-                f"Angle: j1={angle[0]:.2f}, j2={angle[1]:.2f}, j3={angle[2]:.2f}\n"
-                f"Angle: j4={angle[3]:.2f}, j5={angle[4]:.2f}, j6={angle[5]:.2f}\n"
-                )
+                state_dict = {"cmd": "angle"}
+                state_dict["angles": angle]
+
+                state_msg = json.dumps(state_dict)
 
                 self.conn.sendall(state_msg.encode())
                 self.get_logger().info('Sent angle data to client')
@@ -379,10 +404,9 @@ class TCPBridgeNode(Node):
             try:
                 velocity = self.joint_info["velocity"]
 
-                state_msg = (
-                f"Velocity: j1={velocity[0]:.2f}, j2={velocity[1]:.2f}, j3={velocity[2]:.2f}\n"
-                f"Velocity: j4={velocity[0]:.2f}, j5={velocity[1]:.2f}, j6={velocity[2]:.2f}\n"
-                )
+                state_dict = {"cmd": "velocity"}
+                state_dict["velocities"] = velocity
+                state_msg = json.dumps(state_dict)
 
                 self.conn.sendall(state_msg.encode())
                 self.get_logger().info('Sent position data to client')
@@ -417,13 +441,20 @@ class TCPBridgeNode(Node):
         def on_result(future):
             ros_msg = String()
 
+            ros_dict = {"cmd": "set_joint_velocity"}
+
             if future.result() is not None:
                 self.get_logger().info(f'vc_set_joint_velocity success {future.result().ret}')
-                ros_msg.data = f'vc_set_joint_velocity success {future.result().ret}'
+                ros_dict["ret"] = future.result().ret
+                ros_dict["message"] = future.result().message
+
             else:
                 self.get_logger().error('vc_set_joint_velocity service call failed')
-                ros_msg.data = 'vc_set_joint_velocity service call failed'
+                ros_dict["ret"] = -1
+                ros_dict["message"] = 'vc_set_joint_velocity service call failed'
+                
             
+            ros_msg.data = json.dumps(ros_dict)
             self.output_pub.publish(ros_msg)
 
         future.add_done_callback(on_result)
@@ -456,12 +487,19 @@ class TCPBridgeNode(Node):
         def on_result(future):
             ros_msg = String()
 
+            ros_dict = {"cmd": "move"}
+
             if future.result() is not None:
                 self.get_logger().info(f'MoveCartesian success {future.result().ret}')
-                ros_msg.data = f'MoveCartesian success {future.result().ret}'
+                ros_dict["ret"] = future.result().ret
+                ros_dict["message"] = future.result().message
+                
             else:
                 self.get_logger().error('MoveCartesian service call failed')
-                ros_msg.data = 'MoveCartesian service call failed'
+                ros_dict["ret"] = -1
+                ros_dict["message"] = 'MoveCartesian service call failed'
+
+            ros_msg.data = json.dumps(ros_dict)
             
             self.output_pub.publish(ros_msg)
 
@@ -496,13 +534,19 @@ class TCPBridgeNode(Node):
 
         def on_result(future):
             ros_msg = String()
+            ros_dict = {"cmd": "move_joint"}
 
             if future.result() is not None:
                 self.get_logger().info(f'set_servo_angle_j success {future.result().ret}')
-                ros_msg.data = f'set_servo_angle_j success {future.result().ret}'
+                ros_dict["ret"] = future.result().ret
+                ros_dict["message"] = future.result().message
+                
             else:
                 self.get_logger().error('set_servo_angle_j service call failed')
-                ros_msg.data = 'set_servo_angle_j service call failed'
+                ros_dict["ret"] = -1
+                ros_dict["message"] = 'set_servo_angle_j service call failed'
+            
+            ros_msg.data = json.dumps(ros_dict)
             
             self.output_pub.publish(ros_msg)
 

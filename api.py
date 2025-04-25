@@ -32,8 +32,15 @@ class ROSBridgeClient:
             print(f"Sent: {message}")
             
             # Optionally receive a response (1 KB max)
-            response = self.sock.recv(1024).decode()
-            print(f"Received: {response.strip()}")
+            response = self.sock.recv(1024).decode().strip()
+            try:
+                output = json.loads(response)
+                print(f"Received: {response}")
+                return output
+            except json.JSONDecodeError:
+                print(f"Received: {response}")
+                return {"response": response}
+            #return output?
 
         #raise any exception and remove socket
         except Exception as e:
