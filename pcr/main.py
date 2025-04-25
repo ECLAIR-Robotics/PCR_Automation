@@ -40,6 +40,7 @@
 
 import sys
 import os
+import hardware
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from computer_vision.birds_eye_view.overhead2.birdseyeview import (
@@ -81,6 +82,7 @@ def main():
 
         # Plunge down and intake liquid
         # INSERT CODE HERE
+        hardware.get_liquid()
 
         # Move up from beaker
         # INSERT CODE HERE
@@ -90,6 +92,7 @@ def main():
 
         # Plunge down and eject liquid
         # INSERT CODE HERE
+        hardware.eject_liquid()
 
         # Move up from beaker
         # INSERT CODE HERE
