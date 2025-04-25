@@ -82,9 +82,9 @@ def calculate_distance(point1, point2):
     if point1 and point2:
         return np.sqrt((point1[0] - point2[0]) ** 2 + (point1[1] - point2[1]) ** 2)
 
-def initialize_camera() -> cv2.VideoCapture:
+def initialize_camera(camera_number) -> cv2.VideoCapture:
     """Initialize the default webcam and return the capture object."""
-    cap: cv2.VideoCapture = cv2.VideoCapture(1)
+    cap: cv2.VideoCapture = cv2.VideoCapture(camera_number)
     if not cap.isOpened():
         print("Camera not found or not accessible")
         exit()
@@ -109,7 +109,8 @@ def initialize_detector_and_estimator(mtx, tagFamily: str = "tag25h9"):
     
     # Configure the AprilTag pose estimator with camera intrinsic parameters
     config = robotpy_apriltag.AprilTagPoseEstimator.Config(
-        tagSize=0.106,  # Size of the AprilTag in meters
+        # tagSize=0.0605,  # Size of the AprilTag in meters
+        tagSize=0.061,  # Size of the AprilTag in meters
         fx=mtx[0, 0],  # Camera's focal length in the x-direction (pixels)
         fy=mtx[1, 1],  # Camera's focal length in the y-direction (pixels)
         cx=mtx[0, 2],  # Camera's principal point X-coordinate (pixels)
@@ -188,7 +189,7 @@ def process_circles(circles, num_circles, x_positions, y_positions, r_positions,
 
 def process_apriltag(apriltags, estimator, frame):
     """
-    Processes AprilTags detected in the frame, estimates pose, and visualizes the tag.
+    Processes AprilTags detected in the frame, estimates pose, and visualizes the tags with specific outlines.
 
     Args:
         apriltags (list): List of detected AprilTags.
@@ -196,121 +197,118 @@ def process_apriltag(apriltags, estimator, frame):
         frame (numpy array): Frame on which to draw the tag visualization.
 
     Returns:
-        tuple: Center of the detected AprilTag (or None if no tags detected).
+        list: A list of 3 elements corresponding to tag_id 0, 1, 2.
+              Each element is a tuple (center, pose) if detected, or None if not detected.
     """
-    center = None
-    pose = None
-    if len(apriltags) > 0:
-        pose = estimator.estimate(apriltags[0])
-        print(pose)
+    tag_data = [None, None, None]  # Index 0 = tag_id 0, Index 1 = tag_id 1, Index 2 = tag_id 2
+    
+    corner_colors = [(0, 0, 255), (0, 165, 255), (0, 255, 255), (0, 255, 0)]  # Red, Orange, Yellow, Green
 
-        # Get the AprilTag corner coordinates
-        corners = apriltags[0].getCorners((0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0))
-        corners_points = [
-            (int(corners[i]), int(corners[i + 1])) for i in range(0, 8, 2)
-        ]
+    for tag in apriltags:
+        tag_id = tag.getId()
+        if tag_id in [0, 1, 2]:
+            pose = estimator.estimate(tag)
+            color = (255, 0, 0) if tag_id == 0 else (255, 0, 255)  # Blue for 0, Purple for 1 or 2
 
-        # Draw the detected corners
-        for point in corners_points:
-            cv2.circle(frame, point, 5, (0, 255, 0), -1)
+            # Get corners and convert to points
+            corners = tag.getCorners((0.0,) * 8)
+            corners_points = [
+                (int(corners[i]), int(corners[i + 1])) for i in range(0, 8, 2)
+            ]
 
-        # Draw lines between corners
-        for i in range(4):
-            cv2.line(frame, corners_points[i], corners_points[(i + 1) % 4], (0, 255, 0), 2)
+            # Draw corners and edges
+            for i, point in enumerate(corners_points):
+                cv2.circle(frame, point, 5, corner_colors[i], -1)
 
-        # Compute and draw the center of the AprilTag
-        center = tuple(np.mean(corners_points, axis=0, dtype=int))
-        cv2.circle(frame, center, 5, (0, 0, 255), -1)
+            for i in range(4):
+                cv2.line(frame, corners_points[i], corners_points[(i + 1) % 4], color, 2)
 
-    return center, pose
+            # Compute center
+            center = tuple(np.mean(corners_points, axis=0, dtype=int))
+            cv2.circle(frame, center, 5, (0, 0, 255), -1)
 
-def compute_real_world_coordinates(curr_averages, center, pose, mtx, frame):
+            tag_data[tag_id] = (center, pose)
+
+    return tag_data
+
+def compute_real_world_coordinates(center1, pose1, center2, pose2, mtx, frame):
     """
-    Computes real-world coordinates of detected circles based on AprilTag pose estimation.
+    Computes real-world coordinates of detected circles based on the average of two AprilTag pose estimations.
 
     Args:
-        curr_averages (list): List of detected circle centers and radii [(x, y, r), ...].
-        center (tuple): The detected center of the AprilTag (x, y).
-        pose (object): AprilTag pose estimation object.
+        center1 (tuple): Center of AprilTag 1.
+        pose1 (object): Pose of AprilTag 1.
+        center2 (tuple): Center of AprilTag 2.
+        pose2 (object): Pose of AprilTag 2.
         mtx (numpy array): Camera matrix for intrinsic parameters.
         frame (numpy array): Frame on which to overlay distance annotations.
 
     Returns:
-        list: Real-world coordinates of detected circles.
+        list: Averaged real-world coordinates of the computed point.
     """
-    irl_coords = []
-    
-    for (x, y, _) in curr_averages:
-        # Get the translation and rotation of the AprilTag
+    def compute_single_world_coord(center, pose):
+        x, y = center
         x_tag, y_tag, z_tag = pose.translation()
         roll, pitch, yaw = pose.rotation().x, pose.rotation().y, pose.rotation().z
-
-        # Convert rotation angles into a rotation matrix
         r = R.from_euler('xyz', [roll, pitch, yaw])
         R_tag = r.as_matrix()
         n = R_tag[:, 2]
 
-        # Compute real-world coordinates of the detected circles
         r_dir = np.array([(x - mtx[0, 2]) / mtx[0, 0], (y - mtx[1, 2]) / mtx[1, 1], 1])
         r_dir /= np.linalg.norm(r_dir)
 
         p_camera = np.array([0, 0, 0])
         t = np.dot(n, (np.array([x_tag, y_tag, z_tag]) - p_camera)) / np.dot(n, r_dir)
-        p_item = p_camera + t * r_dir
-        irl_coords.append(p_item)
+        return p_camera + t * r_dir
 
-        distance = np.linalg.norm(p_item - np.array([x_tag, y_tag, z_tag]))
+    p1 = compute_single_world_coord(center1, pose1)
+    p2 = compute_single_world_coord(center2, pose2)
+    avg_point = (p1 + p2) / 2
 
-        # Display the calculated distance
-        midpoint = ((center[0] + x) // 2, (center[1] + y) // 2)
-        cv2.putText(frame, f"Dist: {100*distance:.3f} cm", midpoint, 
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
-        cv2.line(frame, center, (x, y), (255, 0, 0), thickness=2)
+    distance = np.linalg.norm(p1 - p2)
 
-    # Compute distances between detected circles
-    for (i1, val1), (i2, val2) in combinations(enumerate(irl_coords), 2):
-        distance = np.linalg.norm(np.array(val1) - np.array(val2))
-        cv2.putText(frame, f"Dist: {100*distance:.3f} cm", 
-                    (curr_averages[i1][0], curr_averages[i1][1]), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
+    midpoint = ((center1[0] + center2[0]) // 2, (center1[1] + center2[1]) // 2)
+    cv2.putText(frame, f"Dist: {100*distance:.3f} cm", midpoint,
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
+    cv2.line(frame, center1, center2, (255, 0, 0), thickness=2)
 
-    return irl_coords
+    return avg_point, distance
 
-def finding_the_angle(frame, tuple_april, list_beaker, pose, mtx):
-    compute_real_world_coordinates(list_beaker, tuple_april, pose, mtx, frame)
-    x_april = tuple_april[0]
-    y_april = tuple_april[1]
-    x_beaker = list_beaker[0][0]
-    y_beaker = list_beaker[0][1]
-    
-    perpendicular = abs(y_beaker - y_april)
-    base = abs(x_beaker - x_april)
+def transform_point_relative_to_tag0(tag0_pose, tag0_center, target_point_world, mtx, frame):
+    """
+    Given a world point, compute dx, dy relative to tag0's facing direction.
+    """
+    # Vector from tag0 to the new point
+    x0, y0 = tag0_center
+    direction_vector = np.array([target_point_world[0] - x0, target_point_world[1] - y0], dtype=np.float64)
+    distance = np.linalg.norm(direction_vector)
 
+    # Get Tag 0's local +x direction
+    r0 = R.from_euler('xyz', [tag0_pose.rotation().x, tag0_pose.rotation().y, tag0_pose.rotation().z])
+    x_axis = r0.as_matrix()[:, 0]
+    x_proj = np.array([x_axis[0], x_axis[1]], dtype=np.float64)
+    x_proj /= np.linalg.norm(x_proj)
 
-    # Draw base (horizontal line)
-    cv2.line(frame, (x_april, y_april), (x_beaker, y_april), (0, 255, 0), 2)  # Green line
+    # Get angle between x_proj and direction_vector
+    direction_vector /= distance
+    dot = np.dot(x_proj, direction_vector)
+    det = x_proj[0]*direction_vector[1] - x_proj[1]*direction_vector[0]
+    angle_rad = np.arctan2(det, dot)
+    angle_deg = np.degrees(angle_rad)
 
-    # Draw perpendicular (vertical line)
-    cv2.line(frame, (x_beaker, y_april), (x_beaker, y_beaker), (255, 0, 0), 2)  # Blue line
+    # Resolve into components in Tag 0 frame
+    dx = distance * math.cos(angle_rad)
+    dy = distance * math.sin(angle_rad)
 
-    # Display angle information
-    cv2.putText(frame, f"Base: {base}px", (x_april, y_april), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-    cv2.putText(frame, f"Perp: {perpendicular}px", (x_beaker, y_april), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
-    
-    print(f"This is perpendicular: {perpendicular}")
-    print(f"This is base: {base}")
+    return dx, dy, angle_deg
 
 def main():
-    num_circles = 1   # Number of circles being tracked
-    max_history = 10  # Maximum number of past detections to store
-    cap = initialize_camera()
+    cap = initialize_camera(0)
     _, mtx, _, _, _ = calibrate(cap)
     detector, estimator, mtx = initialize_detector_and_estimator(mtx)
 
-    # Lists to store detected poqsitions of multiple circles (e.g., beakers)
-    x_positions = [deque(maxlen=max_history) for _ in range(num_circles)]
-    y_positions = [deque(maxlen=max_history) for _ in range(num_circles)]
-    r_positions = [deque(maxlen=max_history) for _ in range(num_circles)]
+    offset_distance_cm = 7.4
+    offset_distance_m = offset_distance_cm / 100  # Convert to meters
 
     try:
         while True:
@@ -320,17 +318,69 @@ def main():
                 print("Failed to grab frame")
                 break
             
-            _, _, _, apriltags, circles = process_image(frame, detector)
-
-            curr_averages = process_circles(circles, num_circles, x_positions, y_positions, r_positions, frame)
+            _, _, _, apriltags, _ = process_image(frame, detector)
 
             # AprilTag processing
-            center, pose = process_apriltag(apriltags, estimator, frame)
+            center_and_pose = process_apriltag(apriltags, estimator, frame)
 
             # Calculate distances from the tag to detected circles
-            if center and curr_averages:
-                irl_coords = compute_real_world_coordinates(curr_averages, center, pose, mtx, frame)
-                finding_the_angle(frame, center, curr_averages, pose, mtx)
+            if center_and_pose[0] and center_and_pose[1]:
+                r1 = R.from_euler('xyz', [center_and_pose[1][1].rotation().x,
+                              center_and_pose[1][1].rotation().y,
+                              center_and_pose[1][1].rotation().z])
+                y_axis_neg = -r1.as_matrix()[:, 1]  # -Y axis
+
+                # Step 2: Move 7.14 cm from Tag 1 along -Y axis
+                translation1 = np.array(center_and_pose[1][1].translation())  # Tag 1 position
+                new_point_world = translation1 + offset_distance_m * y_axis_neg  
+
+                # Step 3: Get Tag 0's translation
+                translation0 = np.array(center_and_pose[0][1].translation())
+
+                # Step 4: Compute vector from Tag 0 to new point
+                _ = new_point_world - translation0
+                dx2, dy2, angle = transform_point_relative_to_tag0(
+                    center_and_pose[0][1],
+                    translation0[:2],  # x, y from pose
+                    new_point_world[:2],
+                    mtx,
+                    frame
+                )
+
+                print("\nPoint 7.14 cm at -90° from Tag 1:")
+                print(f"  Relative to Tag 0:")
+                print(f"    Forward (x): {-dy2 * 100:.3f} cm")
+                print(f"    Lateral (y): {-dx2 * 100:.3f} cm")
+                print(f"    Angle from facing: {angle:.2f} degrees")
+
+            if center_and_pose[0] and center_and_pose[2]:
+                r2 = R.from_euler('xyz', [center_and_pose[2][1].rotation().x,
+                                        center_and_pose[2][1].rotation().y,
+                                        center_and_pose[2][1].rotation().z])
+                y_axis_neg_2 = -r2.as_matrix()[:, 1]  # -Y axis of Tag 2
+
+                # Step 2: Move 7.14 cm from Tag 2 along -Y axis
+                translation2 = np.array(center_and_pose[2][1].translation())  # Tag 2 position
+                new_point_world_2 = translation2 + offset_distance_m * y_axis_neg_2  # 7.14 cm = 0.0714 m
+
+                # Step 3: Get Tag 0's translation
+                translation0 = np.array(center_and_pose[0][1].translation())
+
+                # Step 4: Compute vector from Tag 0 to new point
+                _ = new_point_world_2 - translation0
+                dx3, dy3, angle2 = transform_point_relative_to_tag0(
+                    center_and_pose[0][1],
+                    translation0[:2],
+                    new_point_world_2[:2],
+                    mtx,
+                    frame
+                )
+
+                print("\nPoint 7.14 cm at -90° from Tag 2:")
+                print(f"  Relative to Tag 0:")
+                print(f"    Forward (x): {-dy3 * 100:.3f} cm")
+                print(f"    Lateral (y): {-dx3 * 100:.3f} cm")
+                print(f"    Angle from facing: {angle2:.2f} degrees")
 
             cv2.imshow('Video Feed', frame)
 
