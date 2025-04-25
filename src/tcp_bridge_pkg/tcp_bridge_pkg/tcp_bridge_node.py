@@ -12,7 +12,9 @@ from sensor_msgs.msg import JointState
 
 #TODO: send JSON responses
 #TODO: we return an error code when we actually run into issues
-#TODO: fix change servo angle speed
+#TODO: Implement /ufactory_driver/set_parameters
+#TODO: keep track of current parameters
+#TODO: make sure to store the default parameters since parameters persist
 #TODO: handle unknown cmd
 
 class TCPBridgeNode(Node):
@@ -414,7 +416,8 @@ class TCPBridgeNode(Node):
                 self.get_logger().error(f'Failed to send position data: {e}')
         
         return 
-
+    
+    #NOTE: need to set to Mode 4
     def call_set_joint_velocity_service(self, args):
         from xarm_msgs.srv import MoveVelocity
 
