@@ -47,19 +47,23 @@ class ROSBridgeClient:
             self.sock = None
 
 
+#NOTE: add more commands with arguments
+commands = {
+    "move": {"args": ["x","y","z","speed","acc","mvtime"]}, #input: float32[] x,y,z
+    "home": {"args": []},
+    "position": {"args": []}, 
+    "angle": {"args": []},
+    "move_joint": {"args": ["j1","j2","j3","j4","j5","j6","speed","acc","mvtime"]}, #input: float32[] angles j1-j6
+    "clean_error": {"args":[]},
+    "clean_warn": {"args":[]},
+    "get_state": {"args":[]},
+    "get_mode": {"args":[]},
+    "set_state": {"args":["state"]}, #input: int16
+    "set_mode": {"args":["state"]}, #input: int16
+}
+
 if __name__ == "__main__":
     client = ROSBridgeClient()
-
-    #NOTE: add more commands with arguments
-    commands = {
-        "move": {"args": ["x","y","z","speed","acc","mvtime"]}, #input: float32[] x,y,z
-        "home": {"args": []},
-        "position": {"args": []}, 
-        "angle": {"args": []},
-        "move_joint": {"args": ["j1","j2","j3","j4","j5","j6","speed","acc","mvtime"]}, #input: float32[] angles j1-j6
-        "clean_error": {"args":[]},
-        "clean_warn": {"args":[]}
-    }
 
     try:
         client.connect()

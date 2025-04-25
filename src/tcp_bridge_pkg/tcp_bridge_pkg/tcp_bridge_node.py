@@ -7,10 +7,12 @@ from rclpy.node import Node
 from std_msgs.msg import String
 from xarm_msgs.msg import RobotMsg
 from xarm_msgs.srv import Call
+from xarm_msgs.srv import SetInt16
 
 #TODO: send JSON responses
 #TODO: we return an error code when we actually run into issues
-#TODO: set the robot mode and 
+#TODO: fix change servo angle speed
+#TODO: handle unknown cmd
 
 class TCPBridgeNode(Node):
     def __init__(self):
@@ -75,34 +77,156 @@ class TCPBridgeNode(Node):
                 ros_msg.data = message
                 self.pub.publish(ros_msg)
 
+                #do something like evoke_serivce()
+
                 # If message is 'home', trigger the service call
-                if input["cmd"] == 'home':
-                    self.call_home_service()
-
-                elif input["cmd"] == 'position':
-                    #evoke handle
-                    self.call_position_service()
-
-                elif input["cmd"] == 'angle':
-                    self.call_angle_service()
-
-                elif input["cmd"] == 'move':
-                    #parse "move x y z" fmt
-                    self.call_move_service(input["args"])
-
-                elif input["cmd"] == 'move_joint':
-                    self.call_joint_service(input["args"])
-                
-                elif input["cmd"] == 'clean_error':
-                    self.call_clean_error()
-                
-                elif input["cmd"] == 'clean_warn':
-                    self.call_clean_warning()
+                self.call_service(input["cmd"],input["args"])
                         
             except Exception as e:
                 self.get_logger().error(f"Socket receive error: {e}")
                 break
 
+    def call_service(self, cmd, args):
+            if cmd == 'home':
+                self.call_home_service()
+
+            elif cmd == 'position':
+                #evoke handle
+                self.call_position_service()
+
+            elif cmd == 'angle':
+                self.call_angle_service()
+
+            elif cmd == 'move':
+                #parse "move x y z" fmt
+                self.call_move_service(args)
+
+            elif cmd == 'move_joint':
+                self.call_joint_service(args)
+            
+            elif cmd == 'clean_error':
+                self.call_clean_error()
+            
+            elif cmd == 'clean_warn':
+                self.call_clean_warning()
+
+            elif cmd == 'get_state':
+                self.call_get_state()
+                
+            elif cmd == 'get_mode':
+                self.call_get_mode()
+            
+            elif cmd == 'set_state':
+                #only one arg
+                self.call_set_state(*args)
+            
+            elif cmd == 'set_mode':
+                #only one arg
+                self.call_set_mode(*args)
+
+    def call_set_mode(self,arg):
+        #/ufactory/set_mode [xarm_msgs/srv/SetInt16]
+
+        #create client
+        client = self.create_client(SetInt16, '/ufactory/set_mode')
+
+        #check and wait for the client for 5 seconds
+        if not client.wait_for_service(timeout_sec=5.0):
+            self.get_logger().error('SetInt16 service not avaliable')
+            return
+        
+        #create request object to pass in input
+        request = SetInt16.Request()
+        request.data = int(arg[0])
+        future = client.call_async(request)
+
+        #subfunction that we will pass to callback()
+        def on_result(future):
+            ros_msg = String()
+
+            if future.result() is not None:
+                self.get_logger().info(f'SetInt16 success: {future.result().ret}')
+                ros_msg.data = f'set mode success: {future.result().ret}'
+            else:
+                self.get_logger().error('SetInt16 service call failed')
+                ros_msg.data = 'set mode service call failed'
+
+            self.output_pub.publish(ros_msg)
+
+        future.add_done_callback(on_result)
+    
+    def call_set_state(self,arg):
+        #/ufactory/set_state [xarm_msgs/srv/SetInt16]
+        
+        #create client
+        client = self.create_client(SetInt16, '/ufactory/set_state')
+
+        #check and wait for the client for 5 seconds
+        if not client.wait_for_service(timeout_sec=5.0):
+            self.get_logger().error('SetInt16 service not avaliable')
+            return
+        
+        #create request object to pass in input
+        request = SetInt16.Request()
+        request.data = int(arg)
+        future = client.call_async(request)
+
+        #subfunction that we will pass to callback()
+        def on_result(future):
+            ros_msg = String()
+
+            if future.result() is not None:
+                self.get_logger().info(f'SetInt16 success: {future.result().ret}')
+                ros_msg.data = f'set state success: {future.result().ret}'
+            else:
+                self.get_logger().error('SetInt16 service call failed')
+                ros_msg.data = 'set mode service call failed'
+
+            self.output_pub.publish(ros_msg)
+
+        future.add_done_callback(on_result)
+    
+    def call_get_mode(self):
+        if self.robo_info is None:
+            self.get_logger().error('No data on mode avaliable')
+            return
+         
+        if hasattr(self,'conn'):
+            try:
+                mode = self.robo_info["mode"]
+
+                state_msg = (
+                f"Mode: {mode}\n"
+                )
+
+                self.conn.sendall(state_msg.encode())
+                self.get_logger().info('Sent mode data to client')
+            except Exception as e: 
+                self.get_logger().error(f'Failed to send mode data: {e}')
+        
+        return 
+        
+    
+    def call_get_state(self):
+        if self.robo_info is None:
+            self.get_logger().error('No data on mode avaliable')
+            return
+         
+        if hasattr(self,'conn'):
+            try:
+                state = self.robo_info["state"]
+
+                state_msg = (
+                f"Mode: {state}\n"
+                )
+
+                self.conn.sendall(state_msg.encode())
+                self.get_logger().info('Sent state data to client')
+            except Exception as e: 
+                self.get_logger().error(f'Failed to send state data: {e}')
+        
+        return 
+    
     def call_clean_error(self):
 
         client = self.create_client(Call, '/ufactory/clean_error')
